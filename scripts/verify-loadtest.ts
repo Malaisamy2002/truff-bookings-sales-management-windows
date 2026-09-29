@@ -28,12 +28,15 @@ const { periodStats, paymentSplit } = await import("../src/lib/analytics");
 const { buildExpectedLedger } = await import("../src/lib/loadtest-ledger");
 const { rupees } = await import("../src/lib/money");
 const { sha256Hex } = await import("../src/lib/receipts-share");
+const { priceForDuration } = await import("../src/lib/ops");
+const { turfPrice, buildCourtOccupancy, courtHourSegments } = await import("../src/lib/courts");
 const { taxBreakdown, readAppSettings } = await import("../src/lib/settings");
 
 const mix = (process.argv[2] as "light" | "medium") ?? "light";
 const months = (process.argv.includes("--14") ? 14 : 12) as 12 | 14;
 const anchorArg = process.argv.find((x) => x.startsWith("--anchor="))?.slice(9);
 const anchor = anchorArg;
+const slotBeforeSeed = await (await import("../src/lib/localdb")).db.app_settings.get("slot_durations");
 let failures = 0;
 const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
 const check = (label: string, ok: boolean, detail = "") => {
@@ -81,6 +84,37 @@ const [
     .then((x) => x.filter((r) => r.path.includes("/lt-"))),
   db.snack_stock_history.where("id").startsWith(LT_ID).toArray(),
 ]);
+
+/* C — named courts, coverage and production pricing */
+check("venue seeded with 3 courts", (await db.app_settings.get("slot_durations"))?.value && ((await db.app_settings.get("slot_durations"))!.value as any).total_courts === 3);
+for (const b of bookings) {
+  check(`court id count ${b.id}`, (b.court_ids?.length ?? 0) === b.courts);
+  check(`court ids valid ${b.id}`, (b.court_ids ?? []).every((id) => /^c[123]$/.test(id)));
+  const rateRow = { rate_per_hour: b.rate_per_hour, rate_15: null, rate_30: null, rate_45: null, rate_60: b.rate_per_hour };
+  const expectedTurf = turfPrice(priceForDuration(rateRow, b.hours * 60), b.courts);
+  if (b.turf_amount > 0) eq(`pricing chain ${b.id}`, b.turf_amount, expectedTurf);
+}
+const coverage = new Map<string, number>();
+for (const b of bookings) {
+  if (b.courts === 2 || b.courts === 3) {
+    const k = `${b.courts}x${b.hours}`;
+    coverage.set(k, (coverage.get(k) ?? 0) + 1);
+  }
+}
+for (const k of ["2x1", "3x1", "2x2", "3x2"])
+  check(`coverage ${k} >= 2`, (coverage.get(k) ?? 0) >= 2, `got ${coverage.get(k) ?? 0}`);
+const allVenueIds = new Set(["c1", "c2", "c3"]);
+for (const date of [...new Set(bookings.map((b) => b.booking_date))]) {
+  const occupied = buildCourtOccupancy(bookings, date, 3);
+  for (const [minute, ids] of occupied)
+    check(`capacity ${date} minute ${minute}`, ids.size <= 3 && [...ids].every((id) => allVenueIds.has(id)));
+}
+const courtHours = bookings.filter((b) => b.status !== "Cancelled").reduce((n, b) => n + b.hours * b.courts, 0);
+const segmentedHours = bookings.filter((b) => b.status !== "Cancelled").reduce(
+  (n, b) => n + courtHourSegments(b).reduce((m, seg) => m + ((seg.to - seg.from) / 60) * seg.n, 0),
+  0,
+);
+eq("court-hour conservation", courtHours, segmentedHours);
 
 /* P — payment conservation and shape */
 const parentGross = new Map<string, number>();
@@ -195,6 +229,13 @@ const ledger = buildExpectedLedger({
   dayCloses,
   liveTaxOf: (net) => taxBreakdown(net, liveSettings).taxAmount,
 });
+const ledgerCourtHours = ledger.courtHours;
+check("ledger court-hours matches raw rows", near(ledgerCourtHours, courtHours));
+for (const [month, hours] of Object.entries(ledger.courtHoursByMonth)) {
+  const raw = bookings.filter((b) => b.status !== "Cancelled" && b.booking_date.startsWith(month)).reduce((n, b) => n + b.hours * b.courts, 0);
+  eq(`ledger court-hours ${month}`, hours, raw);
+}
+
 const src = {
   bills,
   bookings,
@@ -253,4 +294,6 @@ console.log(
   `\n${failures === 0 ? "ALL AUDIT CHECKS PASSED" : `${failures} AUDIT CHECK(S) FAILED`}`,
 );
 await clearLoadTestData();
+const slotAfterClear = await db.app_settings.get("slot_durations");
+check("slot_durations restored after clear", JSON.stringify(slotAfterClear?.value ?? null) === JSON.stringify(slotBeforeSeed?.value ?? null));
 process.exit(failures ? 1 : 0);

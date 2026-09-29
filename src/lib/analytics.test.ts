@@ -563,6 +563,63 @@ describe("periodStats() forfeited cancellation revenue", () => {
   });
 });
 
+describe("periodStats() multi-court cancellations", () => {
+  it("forfeits a multi-court advance once — the advance is never multiplied by courts", () => {
+    const s = periodStats(
+      src({
+        bookings: [
+          booking({
+            id: "x1",
+            status: "Cancelled",
+            advance_paid: 1000,
+            courts: 3,
+            total_amount: 3000,
+            turf_amount: 3000,
+          }),
+        ],
+      }),
+      matches,
+      settings(),
+    );
+    expect(s.forfeitedRevenue).toBe(1000); // NOT 3 × 1000
+    expect(s.netRevenue).toBe(1000);
+    expect(s.collected).toBe(1000);
+    expect(s.turfRevenue).toBe(0); // cancelled: contracted price earns nothing
+  });
+
+  it("tracks a refundable multi-court advance as a liability, never as revenue, and never overlaps forfeited", () => {
+    const s = periodStats(
+      src({
+        bookings: [
+          booking({
+            id: "x1",
+            status: "Cancelled",
+            advance_paid: 1000,
+            is_refundable: true,
+            courts: 2,
+            total_amount: 2000,
+            turf_amount: 2000,
+          }),
+          booking({
+            id: "x2",
+            status: "Cancelled",
+            advance_paid: 500,
+            courts: 2,
+            total_amount: 2000,
+            turf_amount: 2000,
+          }),
+        ],
+      }),
+      matches,
+      settings(),
+    );
+    expect(s.refundableAdvance).toBe(1000); // the refundable one only
+    expect(s.forfeitedRevenue).toBe(500); // the non-refundable one only
+    expect(s.netRevenue).toBe(500); // refundable stays out of revenue
+    expect(s.revenue).toBe(500);
+  });
+});
+
 describe("periodStats() refundable cancellation advance", () => {
   it("counts a refundable cancelled booking's advance separately, NOT as revenue", () => {
     const s = periodStats(

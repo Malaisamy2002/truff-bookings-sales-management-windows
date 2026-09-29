@@ -7,6 +7,7 @@ import {
   type ExpenseRow,
   type SnackSaleRow,
   type TurfBookingRow,
+  type PaymentRow,
 } from "./localdb";
 import {
   readAppSettings,
@@ -17,9 +18,11 @@ import { statsForMonth, type PeriodStats, type Sources } from "./analytics";
 import type { ReportPdfDoc, ReportTable } from "./report-pdf";
 
 /**
- * Hand-built, deterministic dataset spanning two real months (July & August
- * 2026) — the SAME data scripts/verify-math.ts audits the calculators
- * against. It exercises every rule in docs/calculation-rules.md at once:
+ * Hand-built, deterministic dataset spanning three real months (July,
+ * August & September 2026) — the SAME data scripts/verify-math.ts audits
+ * the calculators against. September is the multi-court golden block
+ * (MC-1…MC-8, see EXPECTED_SEP below). It exercises every rule in
+ * docs/calculation-rules.md at once:
  * merged bookings, cancelled bookings, paid/partial/unpaid bills, the
  * UTC-slice month-boundary trap (bill VER-INV-0002 is 31 Jul 20:00 UTC =
  * 1 Aug 01:30 IST and must bucket into August), and customer identity
@@ -43,10 +46,14 @@ import type { ReportPdfDoc, ReportTable } from "./report-pdf";
  *             dues 3535, tax 1485
  *   Combined revenue 12855, collected 7445, dues 5410, tax 2405.
  *
- * Per-customer (lifetime, tax-inclusive — same GST setup as above):
- *   Ravi  — turf dues 2306, bill dues 1960, total owed 4266
- *   Priya — turf dues 529,  bill dues 615,  total owed 1144
- *   (4266 + 1144 = 5410 = combined period dues.)
+ * Per-customer (lifetime over ALL seeded rows, tax-inclusive — same GST
+ * setup as above; includes the September multi-court block):
+ *   Ravi  — turf dues 6764, bill dues 1960, total owed 8724
+ *           (turf: TB-1 1076 + TB-5 1230 + MC-1 2952 + MC-7 1230 + MC-8 276)
+ *   Priya — turf dues 4064, bill dues 2337, total owed 6401
+ *           (turf: TB-2 184 + TB-6 345 + MC-2 3535; bills: INV-3 615 +
+ *           MC-BILL-6 1722 — MC-6's merged money sits on the bill)
+ *   (8724 + 6401 = 15125 = 1875 July + 3535 Aug + 9715 Sep period dues.)
  *
  * NOTE on "fully paid" bookings: TB-2 and TB-6 have advance_paid equal to the
  * PRE-tax total_amount. Real bookings store the tax-inclusive gross in
@@ -86,6 +93,7 @@ export async function seedVerificationData() {
   ];
 
   const bill1Id = "ver-bill-0001";
+  const billMc6Id = "ver-bill-mc-0006";
 
   const bills: BillRow[] = [
     // INV-1 — Ravi, July, paid in full (amount_paid 0 by design: "paid"
@@ -161,6 +169,25 @@ export async function seedVerificationData() {
       payment_mode: "Cash",
       bill_date: "2026-08-12T05:00:00.000Z",
       created_at: "2026-08-12T05:00:00.000Z",
+    },
+    // MC-BILL-6 — Priya, September: the bill MC-6 (merged 2-court booking)
+    // points at. Its turf money lives on THIS bill, not in turfRevenue.
+    {
+      id: billMc6Id,
+      invoice_no: `${VER_PREFIX}MC-BILL-6`,
+      customer_name: "Priya",
+      customer_phone: "9000000001",
+      items: [
+        { item: "Turf · Weekdays (VER-MC-6) · 2 courts", rate: 700, qty: 2, total: 1400, unit: "hr" },
+      ],
+      subtotal: 1400,
+      discount: 0,
+      total: 1400,
+      amount_paid: 0,
+      status: "unpaid",
+      payment_mode: null,
+      bill_date: "2026-09-22T05:00:00.000Z",
+      created_at: "2026-09-22T05:00:00.000Z",
     },
   ];
 
@@ -319,6 +346,84 @@ export async function seedVerificationData() {
       created_at: "2026-08-22T14:00:00.000Z",
       merged_into_bill_id: null,
     },
+    // MC-1 — September: 2 courts × 1 h, no advance.
+    {
+      id: "ver-book-mc-0001", booking_no: `${VER_PREFIX}MC-1`, booking_date: "2026-09-03",
+      customer_name: "Ravi", phone: "9876543210", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 1200, total_amount: 2400, advance_paid: 0, payment_mode: "Pending",
+      status: "Confirmed", discount: 0, notes: "verification-seed MC", start_time: "06:00 PM",
+      end_time: "07:00 PM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 2400, created_at: "2026-09-03T12:30:00.000Z", merged_into_bill_id: null,
+    },
+    // MC-2 — 3 courts × 2 h, ₹300 discount, ₹2,000 advance.
+    {
+      id: "ver-book-mc-0002", booking_no: `${VER_PREFIX}MC-2`, booking_date: "2026-09-07",
+      customer_name: "Priya", phone: "9000000001", slot_name: "Weekdays", hours: 2,
+      rate_per_hour: 800, total_amount: 4500, advance_paid: 2000, payment_mode: "Cash",
+      status: "Confirmed", discount: 300, notes: "verification-seed MC", start_time: "04:00 PM",
+      end_time: "06:00 PM", courts: 3, court_ids: ["c1", "c2", "c3"], snacks: [], snacks_total: 0,
+      turf_amount: 4800, created_at: "2026-09-07T10:30:00.000Z", merged_into_bill_id: null,
+    },
+    // MC-3 — 3 courts × 1 h, paid in full, the ₹333 regression.
+    {
+      id: "ver-book-mc-0003", booking_no: `${VER_PREFIX}MC-3`, booking_date: "2026-09-11",
+      customer_name: "Ravi", phone: "9876543210", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 333, total_amount: 999, advance_paid: 1229, payment_mode: "UPI",
+      status: "Completed", discount: 0, notes: "verification-seed MC", start_time: "07:00 PM",
+      end_time: "08:00 PM", courts: 3, court_ids: ["c1", "c2", "c3"], snacks: [], snacks_total: 0,
+      turf_amount: 999, created_at: "2026-09-11T13:30:00.000Z", merged_into_bill_id: null,
+    },
+    // MC-4 — non-refundable cancelled advance becomes forfeited revenue.
+    {
+      id: "ver-book-mc-0004", booking_no: `${VER_PREFIX}MC-4`, booking_date: "2026-09-15",
+      customer_name: "Priya", phone: "9000000001", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 1000, total_amount: 2000, advance_paid: 1000, payment_mode: "Cash",
+      status: "Cancelled", discount: 0, notes: "verification-seed MC", start_time: "05:00 PM",
+      end_time: "06:00 PM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 2000, created_at: "2026-09-15T11:30:00.000Z", merged_into_bill_id: null,
+      is_refundable: false,
+    },
+    // MC-5 — refundable cancelled advance remains a liability and is collected
+    // on its received day via the payment ledger, but never enters revenue.
+    {
+      id: "ver-book-mc-0005", booking_no: `${VER_PREFIX}MC-5`, booking_date: "2026-09-18",
+      customer_name: "Ravi", phone: "9876543210", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 1000, total_amount: 2000, advance_paid: 1000, payment_mode: "UPI",
+      status: "Cancelled", discount: 0, notes: "verification-seed MC", start_time: "05:00 PM",
+      end_time: "06:00 PM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 2000, created_at: "2026-09-18T11:30:00.000Z", merged_into_bill_id: null,
+      is_refundable: true,
+    },
+    // MC-6 — 2 courts × 1 h merged into MC-BILL-6: must vanish from
+    // turfRevenue/turf dues; its gross sits on the bill instead.
+    {
+      id: "ver-book-mc-0006", booking_no: `${VER_PREFIX}MC-6`, booking_date: "2026-09-22",
+      customer_name: "Priya", phone: "9000000001", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 700, total_amount: 1400, advance_paid: 0, payment_mode: "Pending",
+      status: "Confirmed", discount: 0, notes: "verification-seed MC", start_time: "06:00 PM",
+      end_time: "07:00 PM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 1400, created_at: "2026-09-22T12:30:00.000Z", merged_into_bill_id: billMc6Id,
+    },
+    // MC-7 — legacy row: turf_amount 0, courts 2. storedTurfAmount rebuilds
+    // it as 1 h × 500 × 2 = 1,000; tax and dues must follow the rebuild.
+    {
+      id: "ver-book-mc-0007", booking_no: `${VER_PREFIX}MC-7`, booking_date: "2026-09-24",
+      customer_name: "Ravi", phone: "9876543210", slot_name: "Weekdays", hours: 1,
+      rate_per_hour: 500, total_amount: 1000, advance_paid: 0, payment_mode: "Pending",
+      status: "Confirmed", discount: 0, notes: "verification-seed MC", start_time: "06:00 PM",
+      end_time: "07:00 PM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 0, created_at: "2026-09-24T12:30:00.000Z", merged_into_bill_id: null,
+    },
+    // MC-8 — 2 courts, 23:00–01:00 (past midnight), advance = pre-tax total
+    // (the ₹276 live tax is still owed, same convention as TB-2/TB-6).
+    {
+      id: "ver-book-mc-0008", booking_no: `${VER_PREFIX}MC-8`, booking_date: "2026-09-26",
+      customer_name: "Ravi", phone: "9876543210", slot_name: "Weekdays", hours: 2,
+      rate_per_hour: 600, total_amount: 1200, advance_paid: 1200, payment_mode: "UPI",
+      status: "Completed", discount: 0, notes: "verification-seed MC", start_time: "11:00 PM",
+      end_time: "01:00 AM", courts: 2, court_ids: ["c1", "c2"], snacks: [], snacks_total: 0,
+      turf_amount: 1200, created_at: "2026-09-26T12:30:00.000Z", merged_into_bill_id: null,
+    },
   ];
 
   const sales: SnackSaleRow[] = [
@@ -390,6 +495,12 @@ export async function seedVerificationData() {
     },
   ];
 
+  const payments: PaymentRow[] = [
+    { id: "ver-pay-mc-0004-a", parent_type: "turf_booking", parent_id: "ver-book-mc-0004", amount: 600, mode: "Cash", received_at: "2026-09-15T11:30:00.000Z", created_at: "2026-09-15T11:30:00.000Z" },
+    { id: "ver-pay-mc-0004-b", parent_type: "turf_booking", parent_id: "ver-book-mc-0004", amount: 400, mode: "UPI", received_at: "2026-09-15T11:31:00.000Z", created_at: "2026-09-15T11:31:00.000Z" },
+    { id: "ver-pay-mc-0005", parent_type: "turf_booking", parent_id: "ver-book-mc-0005", amount: 1000, mode: "UPI", received_at: "2026-09-18T11:30:00.000Z", created_at: "2026-09-18T11:30:00.000Z" },
+  ];
+
   const expenses: ExpenseRow[] = [
     {
       id: "ver-exp-0001",
@@ -432,6 +543,7 @@ export async function seedVerificationData() {
   await db.customers.bulkAdd(customers);
   await db.bills.bulkAdd(bills);
   await db.turf_bookings.bulkAdd(bookings);
+  await db.payments.bulkAdd(payments);
   await db.snack_sales.bulkAdd(sales);
   await db.expenses.bulkAdd(expenses);
   await resyncCounters();
@@ -441,6 +553,7 @@ export async function seedVerificationData() {
     bills: bills.length,
     bookings: bookings.length,
     sales: sales.length,
+    payments: payments.length,
     expenses: expenses.length,
   };
 }
@@ -464,6 +577,11 @@ export async function clearVerificationData() {
     .map((b) => b.id);
   await db.turf_bookings.bulkDelete(bookingIds);
 
+  const paymentIds = (await db.payments.toArray())
+    .filter((p) => p.id.startsWith("ver-pay-"))
+    .map((p) => p.id);
+  await db.payments.bulkDelete(paymentIds);
+
   const saleIds = (await db.snack_sales.toArray())
     .filter((s) => s.bill_no.startsWith(VER_PREFIX))
     .map((s) => s.id);
@@ -481,6 +599,7 @@ export async function clearVerificationData() {
     bills: billIds.length,
     bookings: bookingIds.length,
     sales: saleIds.length,
+    payments: paymentIds.length,
     expenses: expenseIds.length,
   };
 }
@@ -556,6 +675,33 @@ const EXPECTED_AUG = {
   snackProfit: 150,
 };
 
+// September 2026 multi-court block (MC-1…MC-8), hand-derived row by row:
+//   MC-1  turf 2400, tax 216+216+120 = 552,            due 2952
+//   MC-2  total 4500 (4800 − 300), tax 405+405+225 = 1035, advance 2000, due 3535
+//   MC-3  999, tax 90+90+50 = 230, paid 1229,          due 0
+//   MC-4  cancelled non-refundable: forfeited 1000,    collected 1000 (payments)
+//   MC-5  cancelled refundable: liability 1000,        collected 1000 (payments)
+//   MC-6  merged 2-court booking: excluded from turf;  its bill carries 1400
+//   MC-BILL-6  bill 1400, tax 126+126+70 = 322, unpaid, due 1722
+//   MC-7  legacy rebuild 1×500×2 = 1000, tax 90+90+50 = 230, no advance, due 1230
+//   MC-8  2 courts × 2 h = 1200, tax 108+108+60 = 276, advance 1200 (raw),
+//         due 276 (23:00–01:00; month bucketing follows booking_date)
+const EXPECTED_SEP = {
+  billsRevenue: 1400,
+  tax: 552 + 1035 + 230 + 322 + 230 + 276,
+  turfRevenue: 2400 + 4500 + 999 + 1000 + 1200, // MC-4/5 cancelled, MC-6 merged
+  snacksRevenue: 0,
+  netRevenue: 2400 + 4500 + 999 + 1000 + 1000 + 1400 + 1200,
+  revenue:
+    2400 + 4500 + 999 + 1000 + 1000 + 1400 + 1200 +
+    (552 + 1035 + 230 + 322 + 230 + 276),
+  collected: 2000 + 1229 + 1000 + 1000 + 1200,
+  expenses: 0,
+  profit: 12499, // netRevenue (2400+4500+999+1000 turf + 1400 bill + 1000 forfeited)
+  dues: 2952 + 3535 + 1230 + 276 + 1722,
+  snackProfit: 0,
+};
+
 const FIELD_LABELS: Record<keyof typeof EXPECTED_JUL, string> = {
   billsRevenue: "Bills revenue (net of tax)",
   tax: "Tax collected (GST 18% + Service 5%)",
@@ -593,11 +739,12 @@ export type VerificationCheckResult = {
  * the same formula agreeing with each other.
  */
 export async function runVerificationCheck(): Promise<VerificationCheckResult> {
-  const [billRows, bookingRows, saleRows, expenseRows] = await Promise.all([
+  const [billRows, bookingRows, saleRows, expenseRows, paymentRows] = await Promise.all([
     db.bills.toArray(),
     db.turf_bookings.toArray(),
     db.snack_sales.toArray(),
     db.expenses.toArray(),
+    db.payments.toArray(),
   ]);
   const bills = billRows.filter((b) => b.invoice_no.startsWith(VER_PREFIX));
   const bookings = bookingRows.filter((b) =>
@@ -607,6 +754,7 @@ export async function runVerificationCheck(): Promise<VerificationCheckResult> {
   const expenses = expenseRows.filter((e) =>
     (e.expense_no ?? "").startsWith(VER_PREFIX),
   );
+  const payments = paymentRows.filter((p) => p.id.startsWith("ver-pay-"));
 
   // Match the tax setup the expected literals above were computed under,
   // regardless of what Settings currently has (seedVerificationData turns
@@ -625,6 +773,7 @@ export async function runVerificationCheck(): Promise<VerificationCheckResult> {
     bookings,
     sales,
     expenses,
+    payments,
     tabEntries: [],
   } as unknown as Sources;
 
@@ -648,13 +797,21 @@ export async function runVerificationCheck(): Promise<VerificationCheckResult> {
       });
     }
   };
+  const sep = statsForMonth(src, "2026-09", settings);
   addRows("July 2026", jul, EXPECTED_JUL);
   addRows("August 2026", aug, EXPECTED_AUG);
+  addRows("September 2026", sep, EXPECTED_SEP);
+  rows.push({
+    label: "September 2026 — refundable advance liability",
+    expected: 1000,
+    actual: sep.refundableAdvance,
+    pass: Math.abs(sep.refundableAdvance - 1000) < 0.5,
+  });
 
   return {
     ranAt: nowIso(),
     recordsFound:
-      bills.length + bookings.length + sales.length + expenses.length,
+      bills.length + bookings.length + sales.length + expenses.length + payments.length,
     rows,
     allPassed: rows.every((r) => r.pass),
   };

@@ -82,6 +82,8 @@ import {
 import { currentYear } from "./years";
 import { bookingTaxable, freezeTax } from "./biz";
 import { readAppSettings, writeAppSettings } from "./settings";
+import { priceForDuration } from "./ops";
+import { turfPrice } from "./courts";
 import { localDateStr } from "./utils";
 import {
   bookingPaymentRows,
@@ -102,6 +104,7 @@ export const LT_ID = "lt-";
 const SINGLE_BILL_MODES = ["Cash", "UPI", "Card"] as const;
 /** Courts the seeded venue has: a slot can hold at most this many bookings. */
 export const LOAD_TEST_COURTS = 3;
+const LT_SLOT_DURATIONS_BACKUP_KEY = "loadtest:slot_durations_backup";
 /** How many of the final day's records are pushed onto customer tabs. */
 export const LAST_DAY_TAB_RECORDS = 6;
 export const LOAD_TEST_CUSTOMERS = 100;
@@ -109,6 +112,20 @@ export const LOAD_TEST_SNACK_ITEMS = 50;
 export const LOAD_TEST_STOCK_START = 100;
 /** Exactly one calendar year of data. */
 export const LOAD_TEST_YEARS = 1;
+
+/** Deterministic placements that guarantee multi-court/multi-hour coverage.
+ * Each shape appears twice per seeded year; scenario/status/discount variation
+ * is fixed too so rare random branches cannot erase coverage. */
+const FORCED_COVERAGE = [
+  { courts: 2, hours: 1, scenario: "B1" as const, discount: 0 },
+  { courts: 3, hours: 1, scenario: "B2" as const, discount: 100 },
+  { courts: 2, hours: 2, scenario: "B9" as const, discount: 0 },
+  { courts: 3, hours: 2, scenario: "B10" as const, discount: 10 },
+  { courts: 2, hours: 1, scenario: "B11" as const, discount: 0 },
+  { courts: 3, hours: 1, scenario: "B1" as const, discount: 100 },
+  { courts: 2, hours: 2, scenario: "B2" as const, discount: 10 },
+  { courts: 3, hours: 2, scenario: "B11" as const, discount: 0 },
+] as const;
 
 /** The seven bookable hourly slots, in the same "h:mm AM/PM" label format
  * `minuteLabel()` (TimeSlotPicker) writes onto real bookings. */
@@ -509,19 +526,32 @@ export async function seedLoadTestData(
     );
   }
   if (liveRows === 0) writeAppSettings(taxSettings);
-  // F1: seed the venue to LOAD_TEST_COURTS so multi-court occupancy, named-court
-  // assignment, slot "N/M free" and utilisation all compute against 3 courts
-  // (the default is 1). The owner's real value is captured and restored on clear.
-  const priorSlotRow = await db.app_settings.get("slot_durations");
-  const priorSlotDurations = priorSlotRow ? (priorSlotRow.value as Record<string, unknown>) : null;
+
+  // F1: load-test data must run against the same three-court venue it claims
+  // to seed. Preserve the real setting so clearing the dataset restores it.
+  const previousSlotSetting = await db.app_settings.get("slot_durations");
+  const backupSetting = await db.app_settings.get(LT_SLOT_DURATIONS_BACKUP_KEY);
+  if (!backupSetting) {
+    await db.app_settings.put({
+      key: LT_SLOT_DURATIONS_BACKUP_KEY,
+      value: previousSlotSetting
+        ? { present: true, value: previousSlotSetting.value }
+        : { present: false },
+      updated_at: nowIso(),
+    });
+  }
+  const previousValue = (previousSlotSetting?.value ?? {}) as Record<string, unknown>;
   await db.app_settings.put({
     key: "slot_durations",
-    updated_at: new Date().toISOString(),
     value: {
-      allow_15: true, allow_30: true, allow_45: true, allow_60: true,
+      allow_15: previousValue.allow_15 !== false,
+      allow_30: previousValue.allow_30 !== false,
+      allow_45: previousValue.allow_45 !== false,
+      allow_60: previousValue.allow_60 !== false,
       total_courts: LOAD_TEST_COURTS,
       court_names: Array.from({ length: LOAD_TEST_COURTS }, (_, i) => `Court ${i + 1}`),
     },
+    updated_at: nowIso(),
   });
 
   const { rows: customerRows, pick: pickCustomer } =
@@ -603,6 +633,15 @@ export async function seedLoadTestData(
       if (date < startWindowDate || date > endWindowDate) continue;
       const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
       const weekend = dow === 0 || dow === 6;
+      const dayOrdinal = Math.floor(
+        (Date.parse(date) - Date.parse(startWindowDate)) / 86400000,
+      );
+      const forcedCoverage =
+        dayOrdinal >= 0 && dayOrdinal < FORCED_COVERAGE.length
+          ? FORCED_COVERAGE[dayOrdinal]
+          : dayOrdinal >= 180 && dayOrdinal < 180 + FORCED_COVERAGE.length
+            ? FORCED_COVERAGE[dayOrdinal - 180]
+            : null;
 
       /* ---- turf bookings: scenario-driven, real payment rows ---- */
       const busy = (weekend ? 1.25 : 0.9) * (0.75 + bookingRand() * 0.6);
@@ -614,19 +653,25 @@ export async function seedLoadTestData(
           const cellKey = `${s}:${court}`;
           if (consumedCells.has(cellKey)) continue;
           const chance =
-            cfg.occupancy * busy * slotPull * (court === 1 ? 1 : 0.7);
+            forcedCoverage && s === 0 && court === 1
+              ? 1
+              : cfg.occupancy * busy * slotPull * (court === 1 ? 1 : 0.7);
           if (bookingRand() > chance) continue;
           const cust = pickCustomer();
           const rate = weekend ? 1400 : 1200;
-          let courtsUsed = 1;
+          let courtsUsed =
+            forcedCoverage && s === 0 && court === 1
+              ? forcedCoverage.courts
+              : 1;
           while (
             courtsUsed < LOAD_TEST_COURTS - court + 1 &&
             !consumedCells.has(`${s}:${court + courtsUsed}`) &&
             bookingRand() < 0.12
           )
             courtsUsed++;
-          let hours = 1;
+          let hours = forcedCoverage && s === 0 && court === 1 ? forcedCoverage.hours : 1;
           if (
+            !forcedCoverage &&
             s + 1 < LOAD_TEST_SLOTS.length &&
             bookingRand() < (weekend ? 0.12 : 0.06)
           ) {
@@ -640,16 +685,31 @@ export async function seedLoadTestData(
             if (hours === 2) consumedCells.add(`${s + 1}:${c}`);
           }
 
-          const turfAmount = rupees(rate * hours * courtsUsed);
+          const rateRow = {
+            rate_per_hour: rate,
+            rate_15: null,
+            rate_30: null,
+            rate_45: null,
+            rate_60: rate,
+          };
+          // F5: use the production pricing path, then apply the courts multiplier
+          // once. This prevents the seeder and app from independently defining
+          // what a multi-court booking costs.
+          const pricePerCourt = priceForDuration(rateRow, hours * 60);
+          const turfAmount = turfPrice(pricePerCourt, courtsUsed);
           const roll = bookingRand();
-          const discount =
-            roll < 0.6
+          const discount = forcedCoverage && s === 0 && court === 1
+            ? rupees(forcedCoverage.discount === 10 ? turfAmount * 0.10 : forcedCoverage.discount)
+            : roll < 0.6
               ? 0
               : roll < 0.85
                 ? rupees(turfAmount * (0.05 + bookingRand() * 0.15))
                 : 100;
           const total = Math.max(0, rupees(turfAmount - discount));
-          const scenario = pickBookingScenario(bookingRand);
+          const scenario =
+            forcedCoverage && s === 0 && court === 1
+              ? forcedCoverage.scenario
+              : pickBookingScenario(bookingRand);
           const legacy = scenario === "B14";
           const gross =
             total + (legacy ? 0 : freezeTax(total, taxSettings).taxAmount);
@@ -903,7 +963,10 @@ export async function seedLoadTestData(
             start_time: slot.start,
             end_time: hours === 2 ? LOAD_TEST_SLOTS[s + 1]!.end : slot.end,
             courts: courtsUsed,
-            court_ids: Array.from({ length: courtsUsed }, (_, i) => `c${(i % LOAD_TEST_COURTS) + 1}`),
+            court_ids: Array.from(
+              { length: courtsUsed },
+              (_, i) => `c${court + i}`,
+            ),
             snacks: [],
             snacks_total: 0,
             turf_amount: turfAmount,
@@ -2202,6 +2265,22 @@ export async function clearLoadTestData(): Promise<LoadTestCounts> {
   if (hashPaths.length) await db.receipt_hashes.bulkDelete(hashPaths);
   await wipe(db.day_closes);
   await wipe(db.day_close_history);
+
+  // Restore the user's venue setting after the load-test data is removed.
+  const backup = await db.app_settings.get(LT_SLOT_DURATIONS_BACKUP_KEY);
+  if (backup) {
+    const value = backup.value as { present?: boolean; value?: unknown };
+    if (value.present) {
+      await db.app_settings.put({
+        key: "slot_durations",
+        value: value.value ?? {},
+        updated_at: nowIso(),
+      });
+    } else {
+      await db.app_settings.delete("slot_durations");
+    }
+    await db.app_settings.delete(LT_SLOT_DURATIONS_BACKUP_KEY);
+  }
 
   await resyncCounters();
   return before;

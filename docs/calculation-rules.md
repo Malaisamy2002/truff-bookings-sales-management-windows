@@ -451,9 +451,11 @@ revenue        = netRevenue + tax
 // refundableAdvance is NOT part of netRevenue/revenue/collected/dues — see §3.
 
 collected      = billsCollected
-               + Σ booking.advance_paid        (unmerged, non-cancelled)
-               + snacksRevenue                 (assumed fully paid at sale)
+               + Σ bookingCashCollected(booking, tabEntries)  (unmerged, non-cancelled)
+               + Σ snackSaleCollected(sale, appSettings)
+               + tabCollected
                + forfeitedRevenue
+               + refundableCollected  // cash received for a refundable liability, not revenue
 
 expenses       = Σ expense.amount
 profit         = netRevenue - expenses          // NOT revenue - expenses
@@ -469,91 +471,84 @@ snackProfit    = Σ sale.profit
 `avgBookingValue` (Reports/Dashboard KPI, month-scoped) =
 `turfRevenue / (count of unmerged, non-cancelled bookings that month)`.
 
-## Multi-court bookings
+## 5b. Multi-court bookings
 
-- **Price** = `rupees(pricePerCourt x courts)`, rounded ONCE at the payable
-  point. A 1-hour slot on 3 courts at Rs 500/court = Rs 1,500 (not 3 x Rs 500
-  rounded separately). `courts` absent/0/legacy = 1 court.
-- **Revenue**: `turfRevenue += rupees(b.total_amount)` — counted ONCE per
-  booking, never per-court; the courts multiplier is already inside
-  `total_amount` (`storedTurfAmount` = hours x rate x courts).
-- **Utilization** is court-HOURS: 3 courts for 1 hour = 3 court-hours
-  (`courtHourSegments` / `utilisationPct`).
-- **Availability** is per court-minute: `buildOccupancy` counts concurrent
-  courts; a slot is full only when `occupiedCourts >= totalCourts`. Named
-  courts are assigned exclusively (`assignCourts`); legacy bookings (no
-  `courts`) count as 1 court.
-- **Stored value** (`turf_amount`) always wins; only rebuilt as
-  `hours x rate x courts` when the stored value is 0/absent.
+A booking has both a court count (`courts`) and, on current rows, the named
+courts it holds (`court_ids`). The count is the money/utilisation multiplier;
+the ids are the occupancy/audit assignment. `resolveCourtIds()` is the
+legacy fallback and `backfillCourtIds()` persists a deterministic assignment.
 
----
+Pricing chain:
 
-## 6. Customer-level rollup (`customerLifetimeStats`, src/lib/data.ts)
-
-Same anti-double-counting rules as §2–5, applied per customer instead of
-per period. Customer identity match: phone match wins if both records
-have a normalized phone; otherwise fall back to normalized name
-(`normName`/`normPhone`/`customerKey` — reuse these, don't write a second
-identity rule that can drift from the merge/dedupe logic elsewhere).
-
-```
-billsSpend           = Σ matched bill.total
-turfSpend            = Σ matched booking.total_amount   (unmerged only — merged
-                        booking's money is inside billsSpend already)
-snacksSpend          = Σ matched sale.total
-totalSpend           = billsSpend + turfSpend + snacksSpend
-
-bookingsCount        = count of ALL matched bookings (merged included —
-                        it's a count of visits, not money)
-avgBookingValue      = Σ ALL matched booking.total_amount (merged included)
-                        / bookingsCount
-                        // Deliberately uses gross booking value, not turfSpend,
-                        // so a merged booking doesn't silently read as ₹0 and
-                        // drag the average down.
-
-outstandingTurfDues  = Σ bookingDue(booking) over UNMERGED matched bookings
-                        only (a merged booking is settled through its bill,
-                        so it can't still be "due" here) — tax-inclusive,
-                        via dues.ts, the same figure the Turf tab, Dues tab
-                        and Dashboard show for the same booking. Do NOT
-                        re-derive as total_amount - advance_paid by hand:
-                        that silently drops tax on a taxed booking and will
-                        disagree with those other screens (see §8).
-
-firstActivity/lastActivity = min/max ISO date across all matched
-                        bills/bookings/sales (no exclusions — even a
-                        cancelled booking or merged one is still a real
-                        touchpoint with the business)
+```text
+pricePerCourt = priceForDuration(rateRow, hours × 60)
+turf_amount   = turfPrice(pricePerCourt, courts)
+taxable       = turf_amount + snacks_total − discount
+total_amount  = max(0, taxable)
+tax            = taxBreakdown(total_amount)
+gross          = total_amount + tax
 ```
 
-**Why `avgBookingValue` and `turfSpend` use different booking sets on
-purpose:** `turfSpend` is a *cash total* (must not double-count), so it
-excludes merged bookings. `avgBookingValue` is a *per-event average*
-(nothing to double-count), so it uses every booking. Applying the
-turfSpend-style exclusion to avgBookingValue would understate the average
-for any customer who has merged bookings.
+The courts multiplier is applied once and rounded once. `effectiveRatePerHour`
+is `turf_amount / hours / courts`, rounded to two decimals because it is a
+stored rate, not a payable total. Revenue counts one booking once because the
+courts multiplier is already inside `turf_amount`/`total_amount`.
 
----
+### Legacy zero-`turf_amount` rule
 
----
+A row with `turf_amount === 0` is legacy and is rebuilt everywhere as:
+`rupees(hours × rate_per_hour × max(1, courts))`. `merge.ts`, receipts, exports,
+booking tax/dues and analytics must use the same `storedTurfAmount()` rule;
+there is no second legacy formula.
 
-## 7. Watch item: dormant fields that could become a new double-count
+### Merged-bill line items
 
-`TurfBooking.snacks` / `TurfBooking.snacks_total` exist in the type but
-are currently dead — every write site sets them to `[]`/`0` and nothing
-reads them for money. Snacks linked to a booking today go through the
-separate `sales` table instead (`SnacksTab`'s `booking_id` link), counted
-once via `snacksRevenue`.
+A merged turf line must satisfy `qty × rate = total`. `qty` is court-hours
+(`hours × courts`), `rate` is the per-court hourly rate represented by that
+line, and the label includes the court count. Legacy rows use the same
+reconstructed gross before the booking discount is removed once.
 
-If a future feature starts writing real values into `booking.snacks`
-instead (e.g. "add snacks directly to a booking" without a separate sale
-record), that money **must** be excluded from `snacksRevenue` wherever
-it's summed — otherwise the same snack sale would be counted once via
-`sales` and again via the booking. Follow the same pattern as
-`isFinancialBooking`: one shared predicate/field, reused everywhere,
-never an inline check re-derived per call site.
+### Cancellation / no-show / refund
 
----
+The advance is never multiplied by the court count. A cancelled, non-refundable
+advance is forfeited revenue; a cancelled, refundable advance is a liability.
+If payment rows exist, their Cash/UPI split and received date are preserved. A
+refundable advance received is included in `collected` but not in revenue; the
+liability is `refundableAdvance` until refunded. No-show advances follow the
+forfeiture rule documented in §3.
+
+### Customer metrics
+
+`turfSpend` uses unmerged financial bookings only. `bookingsCount` and
+`avgBookingValue` count merged bookings too because those are event metrics, not
+financial ownership metrics. Outstanding turf dues use the tax-inclusive
+`bookingDue()` result.
+
+### Golden September 2026 multi-court rows
+
+| Row | Setup | Turf | Discount | Total | Tax | Gross | Paid | Due |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| MC-1 | 2 courts, 1 h, ₹1,200/court, no advance | 2,400 | 0 | 2,400 | 552 | 2,952 | 0 | 2,952 |
+| MC-2 | 3 courts, 2 h, ₹800/court, ₹300 discount, ₹2,000 advance | 4,800 | 300 | 4,500 | 1,035 | 5,535 | 2,000 | 3,535 |
+| MC-3 | 3 courts, 1 h, ₹333/court, paid in full | 999 | 0 | 999 | 230 | 1,229 | 1,229 | 0 |
+| MC-4 | 2 courts, cancelled, non-refundable, ₹1,000 advance (Cash 600 + UPI 400) | — | — | 0 | 0 | 0 | 1,000 | 0 |
+| MC-5 | 2 courts, cancelled, refundable, ₹1,000 advance | — | — | 0 | 0 | 0 | 1,000 | 0 |
+| MC-6 | 2 courts, 1 h, ₹700/court, merged into bill MC-BILL-6 | 1,400 | 0 | 1,400 | 322 (on bill) | 1,722 | 0 | 1,722 (on bill) |
+| MC-7 | 2 courts, 1 h, ₹500/court, legacy `turf_amount: 0` (rebuilt 1×500×2) | 1,000 | 0 | 1,000 | 230 | 1,230 | 0 | 1,230 |
+| MC-8 | 2 courts, 2 h, ₹600/court, 23:00–01:00, advance = pre-tax ₹1,200 | 1,200 | 0 | 1,200 | 276 | 1,476 | 1,200 | 276 |
+
+MC-5 is a liability. Its ₹1,000 receipt is included in `collected` on the
+received day under K4 but remains outside revenue, net revenue and dues.
+MC-6 is merged: excluded from every turf figure — its ₹1,400 sits on
+MC-BILL-6 (bills revenue ₹1,400, tax ₹322, dues ₹1,722). MC-7 exercises the
+shared legacy rebuild with `courts: 2`. MC-8 splits across midnight for
+court-hours (2 court-hours on each day) while its money buckets into
+September by `booking_date`.
+
+For MC-1 to MC-8 the September block is expected to show net revenue
+₹12,499 (turf ₹10,099 + bill ₹1,400 + MC-4's ₹1,000 forfeited), tax ₹2,645,
+revenue ₹15,144, dues ₹9,715 and collected ₹6,429 (including MC-5's
+refundable receipt under K4). `refundableAdvance` stays ₹1,000.
 
 ## 8. Checklist before shipping a new calculation
 
@@ -584,7 +579,11 @@ logic is non-trivial:
    (search the whole repo for the function name) so a widened type
    doesn't leave one export silently reporting stale/zero values for the
    new column.
-8. **Sanity-check with a known bad case**: a customer/period with (a) a
+8. **Multi-court audit** → check `court_ids.length === courts`, no named court is
+   held by two live bookings at the same minute, `turf_amount` equals the
+   production pricing chain, and `Σ(hours × courts)` reconciles with the
+   utilisation grid.
+9. **Sanity-check with a known bad case**: a customer/period with (a) a
    merged booking, (b) a cancelled booking, (c) a partially-paid bill.
    Confirm the total doesn't include the cancelled booking, doesn't
    double-count the merged one, and dues reflect only what's actually

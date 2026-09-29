@@ -49,6 +49,57 @@ describe("bookingCourts / clampToVenue", () => {
   });
 });
 
+describe("resolveCourtIds — venue clamp & re-home", () => {
+  it("clamps a courts:3 booking to a 2-court venue", () => {
+    const rows = [
+      {
+        id: "big",
+        booking_date: "2026-03-10",
+        start_time: "6 PM",
+        end_time: null,
+        hours: 1,
+        courts: 3,
+        status: "Confirmed",
+      },
+    ] as unknown as CourtBooking[];
+    expect(resolveCourtIds(rows, 2).get("big")).toEqual(["c1", "c2"]);
+  });
+
+  it("re-homes stored ids that exceed the venue (c3 gone, only 2 valid left)", () => {
+    const rows = [
+      {
+        id: "stored",
+        booking_date: "2026-03-10",
+        start_time: "6 PM",
+        end_time: null,
+        hours: 1,
+        courts: 3,
+        status: "Confirmed",
+        court_ids: ["c1", "c2", "c3"],
+      },
+    ] as unknown as CourtBooking[];
+    const ids = resolveCourtIds(rows, 2).get("stored")!;
+    expect(ids.length).toBe(2);
+    expect(ids.every((c) => c === "c1" || c === "c2")).toBe(true);
+  });
+
+  it("keeps valid stored ids untouched, even when another booking was clamped", () => {
+    const rows = [
+      {
+        id: "ok",
+        booking_date: "2026-03-10",
+        start_time: "6 PM",
+        end_time: null,
+        hours: 1,
+        courts: 2,
+        status: "Confirmed",
+        court_ids: ["c2", "c1"],
+      },
+    ] as unknown as CourtBooking[];
+    expect(resolveCourtIds(rows, 3).get("ok")).toEqual(["c2", "c1"]);
+  });
+});
+
 describe("buildOccupancy", () => {
   it("adds up courts per minute and ignores cancelled bookings", () => {
     const occ = buildOccupancy(
