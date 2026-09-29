@@ -283,7 +283,18 @@ describe("buildMergedItems() — offer/discount can't come off twice", () => {
   });
 
   it("multi-court booking line balances qty × rate and names the courts", () => {
-    const r = buildMergedItems([booking({ hours: 2, courts: 3, turf_amount: 2400, total_amount: 2200, discount: 200 })], []);
+    const r = buildMergedItems(
+      [
+        booking({
+          hours: 2,
+          courts: 3,
+          turf_amount: 2400,
+          total_amount: 2200,
+          discount: 200,
+        }),
+      ],
+      [],
+    );
     expect(r.items[0]!.qty).toBe(6);
     expect(r.items[0]!.rate).toBe(400);
     expect(r.items[0]!.total).toBe(2400);

@@ -237,7 +237,12 @@ export function buildMergedItems(
     // Current rows carry the positive pre-discount turf_amount directly.
     const turfGross = storedTurfAmount(b);
     const hours = Math.max(1, Number(b.hours) || 1);
-    const courts = Math.max(1, Math.round(Number((b as MergeableBooking & { courts?: number }).courts) || 1));
+    const courts = Math.max(
+      1,
+      Math.round(
+        Number((b as MergeableBooking & { courts?: number }).courts) || 1,
+      ),
+    );
     const qty = hours * courts;
     const rate = qty > 0 ? round2(turfGross / qty) : turfGross;
     // A merged line must satisfy qty × rate = total. Qty is court-hours so

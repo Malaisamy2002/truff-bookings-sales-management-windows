@@ -236,7 +236,9 @@ export function buildExpectedLedger(input: {
   // cancelled bookings do not.
   for (const b of input.bookings) {
     if (b.status === "Cancelled") continue;
-    const h = rupees((Number(b.hours) || 0) * Math.max(1, Math.round(Number(b.courts) || 1)));
+    const h = rupees(
+      (Number(b.hours) || 0) * Math.max(1, Math.round(Number(b.courts) || 1)),
+    );
     courtHours += h;
     const m = monthOf(b.booking_date);
     courtHoursByMonth[m] = (courtHoursByMonth[m] ?? 0) + h;
