@@ -9,9 +9,11 @@
  * and the copies had drifted apart. Everything here is pure (no React, no
  * storage) so it can be unit-tested directly.
  *
- * MODEL: a venue has `totalCourts` interchangeable courts. A booking takes
- * `courts` of them for [start, start + hours). Courts are counted, not
- * named — a slot is full once the courts in use reach `totalCourts`.
+ * MODEL: a venue has `totalCourts` NAMED courts (c1…cN, see "NAMED COURTS"
+ * below). A booking takes `courts` of them — recorded as `court_ids` — for
+ * [start, start + hours). A slot is full once the courts in use reach
+ * `totalCourts`; the count (`courts`) drives money and utilisation, the ids
+ * drive occupancy and audit.
  */
 import { parseMinutes } from "@/lib/time-slot-utils";
 import { rupees } from "@/lib/money";

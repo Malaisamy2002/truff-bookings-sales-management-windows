@@ -31,6 +31,7 @@ import {
   type BillStatus,
   type Unit,
 } from "./biz";
+import { storedTurfAmount } from "./courts";
 import { netTabAmountFor } from "./dues";
 import { rupees } from "./money";
 import {
@@ -188,6 +189,7 @@ type MergeableBooking = {
   turf_amount: number;
   total_amount: number;
   discount: number;
+  courts?: number;
 };
 type MergeableSaleItem = {
   item_name: string;
@@ -217,12 +219,12 @@ export type MergedItemsResult = {
  *
  * `turf_amount` is every booking's pre-discount gross under the current
  * schema. A row restored from a backup taken before that field existed has it
- * as 0/undefined — falling back to `total_amount` there would be wrong, since
- * total_amount is already NET of that booking's discount, and the discount
- * gets pulled back in again below. `total_amount + discount` reconstructs the
- * true gross correctly in both cases: for current bookings this branch never
- * runs; for legacy rows, total_amount has always equalled turf_amount minus
- * discount, so adding the discount back recovers turf_amount exactly.
+ * as 0/undefined; `storedTurfAmount()` rebuilds exactly that case as
+ * `hours × rate_per_hour × courts`, the ONE legacy rule shared with
+ * receipts, exports, booking tax/dues and analytics (see
+ * docs/calculation-rules.md §5b). Falling back to `total_amount` would be
+ * wrong here, since total_amount is already NET of the booking's discount
+ * and the discount gets pulled back in again below.
  */
 export function buildMergedItems(
   bookings: MergeableBooking[],
@@ -230,17 +232,22 @@ export function buildMergedItems(
 ): MergedItemsResult {
   const items: BillItem[] = [];
   for (const b of bookings) {
-    // Older rows use zero when turf_amount was not present. Reconstruct those
-    // rows from their net total plus the already-applied discount; current
-    // rows carry the positive pre-discount turf_amount directly.
-    const storedTurf = Number(b.turf_amount) || 0;
-    const turfGross =
-      storedTurf > 0 ? storedTurf : b.total_amount + (Number(b.discount) || 0);
+    // Older rows use zero when turf_amount was not present; storedTurfAmount
+    // rebuilds them with the shared legacy rule (hours × rate × courts).
+    // Current rows carry the positive pre-discount turf_amount directly.
+    const turfGross = storedTurfAmount(b);
+    const hours = Math.max(1, Number(b.hours) || 1);
+    const courts = Math.max(1, Math.round(Number((b as MergeableBooking & { courts?: number }).courts) || 1));
+    const qty = hours * courts;
+    const rate = qty > 0 ? round2(turfGross / qty) : turfGross;
+    // A merged line must satisfy qty × rate = total. Qty is court-hours so
+    // the stored per-court hourly rate remains meaningful, while the label
+    // makes the court multiplier explicit to the customer.
     items.push({
-      item: `Turf · ${b.slot_name} (${b.booking_no})`,
-      qty: b.hours || 1,
-      rate: b.rate_per_hour || turfGross,
-      total: turfGross,
+      item: `Turf · ${b.slot_name} (${b.booking_no}) · ${courts} court${courts === 1 ? "" : "s"}`,
+      qty,
+      rate,
+      total: round2(qty * rate),
       unit: "hr" as Unit,
     });
   }

@@ -42,6 +42,8 @@ export type Ledger = {
   months: Record<string, MonthLedger>;
   days: Record<string, DayLedger>;
   payments: { byMode: Modes; rows: number; byParent: Record<string, number> };
+  courtHours: number;
+  courtHoursByMonth: Record<string, number>;
 };
 
 const n = (v: unknown) => Number(v) || 0;
@@ -134,6 +136,8 @@ export function buildExpectedLedger(input: {
   const days: Record<string, DayLedger> = {};
   const byMode = zeroModes();
   const byParent: Record<string, number> = {};
+  let courtHours = 0;
+  const courtHoursByMonth: Record<string, number> = {};
 
   const ensure = (m: string) => (months[m] ??= blank());
   const ensureDay = (d: string) => (days[d] ??= { cashIn: 0, cashOut: 0 });
@@ -226,6 +230,16 @@ export function buildExpectedLedger(input: {
     m.collected += collected;
     // Snack sales have no "dues" concept (calculation-rules.md §5): an "On tab"
     // sale is owed through its tab charge, never through period dues.
+  }
+
+  // Independent utilisation oracle: merged bookings still occupy courts;
+  // cancelled bookings do not.
+  for (const b of input.bookings) {
+    if (b.status === "Cancelled") continue;
+    const h = rupees((Number(b.hours) || 0) * Math.max(1, Math.round(Number(b.courts) || 1)));
+    courtHours += h;
+    const m = monthOf(b.booking_date);
+    courtHoursByMonth[m] = (courtHoursByMonth[m] ?? 0) + h;
   }
 
   for (const e of input.expenses) {
@@ -399,5 +413,7 @@ export function buildExpectedLedger(input: {
     months,
     days,
     payments: { byMode, rows: input.payments.length, byParent },
+    courtHours,
+    courtHoursByMonth,
   };
 }

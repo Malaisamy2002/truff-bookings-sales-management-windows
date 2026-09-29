@@ -2,7 +2,8 @@
 
 All court capacity, pricing and utilisation math lives in `src/lib/courts.ts`.
 Nothing else should count courts, multiply by courts, or read `b.courts` for
-math — import from there.
+pricing/utilisation math — import from there. `court_ids` is the named-court
+audit/occupancy field; `courts` remains the count multiplier.
 
 ## Model
 A venue has `total_courts` courts, ids `c1…cN` (Settings → Turf rates lets you
@@ -43,8 +44,8 @@ booking whose court no longer exists after the venue's court count is lowered.
 4. Utilisation grid excluded merged bookings, contradicting `docs/calculation-rules.md` §2 (a merged booking still occupied the court). It now also shows % of capacity per cell.
 5. Occupancy kept the court count in a shared mutable variable read by a closure — fragile; each booking now supplies its own.
 
-## Not done
-Court-wise revenue reports (the data is there: `court_ids` on every booking).
-Manually picking or moving a booking to a specific court (assignment is
-automatic by design). The utilisation grid still reports court-hours and % of
-capacity across the venue, not per court.
+## Current limits
+Court-wise revenue reports are not a separate report yet. Manually picking or
+moving a booking to a specific court remains unsupported (assignment is
+automatic by design). The utilisation grid reports court-hours and % of venue
+capacity; named court ids are retained for occupancy and audit.

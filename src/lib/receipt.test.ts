@@ -67,6 +67,14 @@ describe("bookingReceipt() — turf booking invoices", () => {
     expect(amountFor(getTotal(doc, "GRAND TOTAL"))).toBe(1100);
   });
 
+  it("multi-court receipt shows court count and uses the combined turf total", () => {
+    const b = makeBooking({ courts: 3, court_ids: ["c1", "c2", "c3"], rate_per_hour: 333, turf_amount: 999, total_amount: 999 });
+    const doc = bookingReceipt(b);
+    expect(doc.lines[0]!.qty).toContain("3");
+    expect(amountFor(getTotal(doc, "Turf"))).toBe(999);
+    expect(amountFor(getTotal(doc, "GRAND TOTAL"))).toBe(999);
+  });
+
   it("Balance due is GRAND TOTAL minus Advance paid, never negative", () => {
     const b = makeBooking({
       total_amount: 1200,

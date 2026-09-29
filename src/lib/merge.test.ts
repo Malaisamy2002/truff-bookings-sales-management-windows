@@ -268,6 +268,7 @@ describe("buildMergedItems() — offer/discount can't come off twice", () => {
     turf_amount: 1000,
     total_amount: 900,
     discount: 100,
+    courts: 1,
     ...over,
   });
 
@@ -277,6 +278,17 @@ describe("buildMergedItems() — offer/discount can't come off twice", () => {
     expect(r.discount).toBe(100);
     expect(r.total).toBe(900); // 1000 - 100, matches total_amount
     expect(r.items[0]!.total).toBe(1000);
+    expect(r.items[0]!.qty).toBe(2);
+    expect(r.items[0]!.rate).toBe(500);
+  });
+
+  it("multi-court booking line balances qty × rate and names the courts", () => {
+    const r = buildMergedItems([booking({ hours: 2, courts: 3, turf_amount: 2400, total_amount: 2200, discount: 200 })], []);
+    expect(r.items[0]!.qty).toBe(6);
+    expect(r.items[0]!.rate).toBe(400);
+    expect(r.items[0]!.total).toBe(2400);
+    expect(r.items[0]!.qty * r.items[0]!.rate).toBe(r.items[0]!.total);
+    expect(r.items[0]!.item).toContain("3 courts");
   });
 
   it("legacy booking with turf_amount missing: reconstructs gross, never double-subtracts", () => {
@@ -286,7 +298,7 @@ describe("buildMergedItems() — offer/discount can't come off twice", () => {
     const r = buildMergedItems([legacy], []);
     // Naive `turf_amount || total_amount` would give subtotal=900, then
     // subtract the 100 discount again → total=800, silently losing ₹100.
-    expect(r.subtotal).toBe(1000); // reconstructed as total_amount + discount
+    expect(r.subtotal).toBe(1000); // reconstructed via storedTurfAmount (hours × rate × courts — equal to total_amount + discount for this row)
     expect(r.discount).toBe(100);
     expect(r.total).toBe(900); // matches the booking's real total_amount
   });
@@ -296,6 +308,27 @@ describe("buildMergedItems() — offer/discount can't come off twice", () => {
     const r = buildMergedItems([legacy], []);
     expect(r.subtotal).toBe(1000);
     expect(r.total).toBe(1000);
+  });
+
+  it("legacy multi-court row uses the shared hours × rate × courts rule, not total + discount", () => {
+    // Row from the era of docs/courts.md bug 2: priced for 3 courts but the
+    // old merge rule rebuilt it as total_amount + discount (= 1500), losing
+    // the court multiplier. storedTurfAmount rebuilds 2 h × 400 × 3 = 2400.
+    const legacy = booking({
+      hours: 2,
+      rate_per_hour: 400,
+      courts: 3,
+      turf_amount: 0,
+      discount: 100,
+      total_amount: 1400, // ≠ 2400 − 100: the row itself was saved wrong
+    });
+    const r = buildMergedItems([legacy], []);
+    expect(r.items[0]!.qty).toBe(6);
+    expect(r.items[0]!.rate).toBe(400);
+    expect(r.items[0]!.total).toBe(2400);
+    expect(r.subtotal).toBe(2400);
+    expect(r.discount).toBe(100);
+    expect(r.total).toBe(2300);
   });
 
   it("mixes bookings and snack-sale items, discount only ever from bookings", () => {

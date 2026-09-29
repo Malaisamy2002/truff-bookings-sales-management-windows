@@ -36,6 +36,16 @@ describe("backfillCourtIds", () => {
     expect((await db.turf_bookings.get("c"))?.court_ids).toEqual(["c1"]);
   });
 
+  it("leaves seeded named-court assignments untouched", async () => {
+    await db.turf_bookings.bulkAdd([
+      row("seeded", "6 PM", { courts: 2, court_ids: ["c2", "c3"] }),
+      row("legacy", "6 PM", { courts: 1 }),
+    ]);
+    expect(await backfillCourtIds(3)).toBe(1);
+    expect((await db.turf_bookings.get("seeded"))?.court_ids).toEqual(["c2", "c3"]);
+    expect((await db.turf_bookings.get("legacy"))?.court_ids).toEqual(["c1"]);
+  });
+
   it("is idempotent — a second pass changes nothing", async () => {
     await db.turf_bookings.bulkAdd([row("a", "6 PM"), row("b", "6 PM")]);
     expect(await backfillCourtIds(2)).toBe(2);
