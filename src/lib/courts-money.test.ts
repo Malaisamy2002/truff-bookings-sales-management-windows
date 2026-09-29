@@ -40,14 +40,14 @@ describe("multi-court money", () => {
   });
 
   it("courtHourSegments: 1 court x 1h = 1 court-hour segment; 3 courts = n:3", () => {
-    const one = courtHourSegments({ courts: 1, start_time: "18:00", end_time: "19:00" });
+    const one = courtHourSegments({ courts: 1, start_time: "18:00", end_time: "19:00", booking_date: "2026-09-01", hours: 1 } as never);
     expect(one).toEqual([{ dayOffset: 0, from: 1080, to: 1140, n: 1 }]);
-    const three = courtHourSegments({ courts: 3, start_time: "18:00", end_time: "19:00" });
+    const three = courtHourSegments({ courts: 3, start_time: "18:00", end_time: "19:00", booking_date: "2026-09-01", hours: 1 } as never);
     expect(three).toEqual([{ dayOffset: 0, from: 1080, to: 1140, n: 3 }]);
   });
 
   it("midnight-crossing splits court-hours across two days", () => {
-    const segs = courtHourSegments({ courts: 2, start_time: "23:00", end_time: "01:00" });
+    const segs = courtHourSegments({ courts: 2, start_time: "23:00", end_time: "01:00", booking_date: "2026-09-01", hours: 2 } as never);
     expect(segs).toEqual([
       { dayOffset: 0, from: 1380, to: 1440, n: 2 }, // 23:00-24:00 = 1h x 2 courts
       { dayOffset: 1, from: 0, to: 60, n: 2 },      // 00:00-01:00 next day
