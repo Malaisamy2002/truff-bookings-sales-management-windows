@@ -516,6 +516,7 @@ export async function seedLoadTestData(
   const priorSlotDurations = priorSlotRow ? (priorSlotRow.value as Record<string, unknown>) : null;
   await db.app_settings.put({
     key: "slot_durations",
+    updated_at: new Date().toISOString(),
     value: {
       allow_15: true, allow_30: true, allow_45: true, allow_60: true,
       total_courts: LOAD_TEST_COURTS,
