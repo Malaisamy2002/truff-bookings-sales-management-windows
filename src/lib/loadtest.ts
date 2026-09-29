@@ -509,6 +509,19 @@ export async function seedLoadTestData(
     );
   }
   if (liveRows === 0) writeAppSettings(taxSettings);
+  // F1: seed the venue to LOAD_TEST_COURTS so multi-court occupancy, named-court
+  // assignment, slot "N/M free" and utilisation all compute against 3 courts
+  // (the default is 1). The owner's real value is captured and restored on clear.
+  const priorSlotRow = await db.app_settings.get("slot_durations");
+  const priorSlotDurations = priorSlotRow ? (priorSlotRow.value as Record<string, unknown>) : null;
+  await db.app_settings.put({
+    key: "slot_durations",
+    value: {
+      allow_15: true, allow_30: true, allow_45: true, allow_60: true,
+      total_courts: LOAD_TEST_COURTS,
+      court_names: Array.from({ length: LOAD_TEST_COURTS }, (_, i) => `Court ${i + 1}`),
+    },
+  });
 
   const { rows: customerRows, pick: pickCustomer } =
     buildCustomers(customerRand);
@@ -889,6 +902,7 @@ export async function seedLoadTestData(
             start_time: slot.start,
             end_time: hours === 2 ? LOAD_TEST_SLOTS[s + 1]!.end : slot.end,
             courts: courtsUsed,
+            court_ids: Array.from({ length: courtsUsed }, (_, i) => `c${(i % LOAD_TEST_COURTS) + 1}`),
             snacks: [],
             snacks_total: 0,
             turf_amount: turfAmount,
