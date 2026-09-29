@@ -90,7 +90,7 @@ check("venue seeded with 3 courts", (await db.app_settings.get("slot_durations")
 for (const b of bookings) {
   check(`court id count ${b.id}`, (b.court_ids?.length ?? 0) === b.courts);
   check(`court ids valid ${b.id}`, (b.court_ids ?? []).every((id) => /^c[123]$/.test(id)));
-  const rateRow = { rate_per_hour: b.rate_per_hour, rate_15: null, rate_30: null, rate_45: null, rate_60: b.rate_per_hour };
+  const rateRow = { id: `verify-${b.id}`, slot_name: b.slot_name ?? "verify", is_active: true, rate_per_hour: b.rate_per_hour, rate_15: null, rate_30: null, rate_45: null, rate_60: b.rate_per_hour };
   const expectedTurf = turfPrice(priceForDuration(rateRow, b.hours * 60), b.courts);
   if (b.turf_amount > 0) eq(`pricing chain ${b.id}`, b.turf_amount, expectedTurf);
 }

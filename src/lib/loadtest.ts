@@ -544,10 +544,10 @@ export async function seedLoadTestData(
   await db.app_settings.put({
     key: "slot_durations",
     value: {
-      allow_15: previousValue.allow_15 !== false,
-      allow_30: previousValue.allow_30 !== false,
-      allow_45: previousValue.allow_45 !== false,
-      allow_60: previousValue.allow_60 !== false,
+      allow_15: previousValue["allow_15"] !== false,
+      allow_30: previousValue["allow_30"] !== false,
+      allow_45: previousValue["allow_45"] !== false,
+      allow_60: previousValue["allow_60"] !== false,
       total_courts: LOAD_TEST_COURTS,
       court_names: Array.from({ length: LOAD_TEST_COURTS }, (_, i) => `Court ${i + 1}`),
     },
@@ -686,6 +686,9 @@ export async function seedLoadTestData(
           }
 
           const rateRow = {
+            id: `loadtest-${slot.name}`,
+            slot_name: slot.name,
+            is_active: true,
             rate_per_hour: rate,
             rate_15: null,
             rate_30: null,
