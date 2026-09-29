@@ -258,20 +258,103 @@ const srcSep = {
 };
 
 const multiCourtBookings = [
-  booking({ id: "mc1", booking_date: "2026-09-03", total_amount: 2400, turf_amount: 2400, hours: 1, rate_per_hour: 1200, courts: 2, advance_paid: 0 }),
-  booking({ id: "mc2", booking_date: "2026-09-07", total_amount: 4500, turf_amount: 4800, hours: 2, rate_per_hour: 800, courts: 3, discount: 300, advance_paid: 2000 }),
-  booking({ id: "mc3", booking_date: "2026-09-11", total_amount: 999, turf_amount: 999, hours: 1, rate_per_hour: 333, courts: 3, advance_paid: 1229, status: "Completed" }),
-  booking({ id: "mc4", booking_date: "2026-09-15", total_amount: 2000, turf_amount: 2000, hours: 1, rate_per_hour: 1000, courts: 2, advance_paid: 1000, status: "Cancelled", is_refundable: false }),
-  booking({ id: "mc5", booking_date: "2026-09-18", total_amount: 2000, turf_amount: 2000, hours: 1, rate_per_hour: 1000, courts: 2, advance_paid: 1000, status: "Cancelled", is_refundable: true, payment_mode: "UPI" }),
+  booking({
+    id: "mc1",
+    booking_date: "2026-09-03",
+    total_amount: 2400,
+    turf_amount: 2400,
+    hours: 1,
+    rate_per_hour: 1200,
+    courts: 2,
+    advance_paid: 0,
+  }),
+  booking({
+    id: "mc2",
+    booking_date: "2026-09-07",
+    total_amount: 4500,
+    turf_amount: 4800,
+    hours: 2,
+    rate_per_hour: 800,
+    courts: 3,
+    discount: 300,
+    advance_paid: 2000,
+  }),
+  booking({
+    id: "mc3",
+    booking_date: "2026-09-11",
+    total_amount: 999,
+    turf_amount: 999,
+    hours: 1,
+    rate_per_hour: 333,
+    courts: 3,
+    advance_paid: 1229,
+    status: "Completed",
+  }),
+  booking({
+    id: "mc4",
+    booking_date: "2026-09-15",
+    total_amount: 2000,
+    turf_amount: 2000,
+    hours: 1,
+    rate_per_hour: 1000,
+    courts: 2,
+    advance_paid: 1000,
+    status: "Cancelled",
+    is_refundable: false,
+  }),
+  booking({
+    id: "mc5",
+    booking_date: "2026-09-18",
+    total_amount: 2000,
+    turf_amount: 2000,
+    hours: 1,
+    rate_per_hour: 1000,
+    courts: 2,
+    advance_paid: 1000,
+    status: "Cancelled",
+    is_refundable: true,
+    payment_mode: "UPI",
+  }),
   // MC-6 — merged into the September bill below: excluded from every turf
   // figure; its money lives on the bill.
-  booking({ id: "mc6", booking_date: "2026-09-22", total_amount: 1400, turf_amount: 1400, hours: 1, rate_per_hour: 700, courts: 2, advance_paid: 0, merged_into_bill_id: "mc-bill-6" }),
+  booking({
+    id: "mc6",
+    booking_date: "2026-09-22",
+    total_amount: 1400,
+    turf_amount: 1400,
+    hours: 1,
+    rate_per_hour: 700,
+    courts: 2,
+    advance_paid: 0,
+    merged_into_bill_id: "mc-bill-6",
+  }),
   // MC-7 — legacy zero turf_amount with courts 2: rebuilt as 1 h × 500 × 2 =
   // 1000 everywhere (storedTurfAmount).
-  booking({ id: "mc7", booking_date: "2026-09-24", total_amount: 1000, turf_amount: 0, hours: 1, rate_per_hour: 500, courts: 2, advance_paid: 0 }),
+  booking({
+    id: "mc7",
+    booking_date: "2026-09-24",
+    total_amount: 1000,
+    turf_amount: 0,
+    hours: 1,
+    rate_per_hour: 500,
+    courts: 2,
+    advance_paid: 0,
+  }),
   // MC-8 — past midnight (23:00–01:00), 2 courts; advance = pre-tax total,
   // so the ₹276 live tax is still owed (TB-2/TB-6 convention).
-  booking({ id: "mc8", booking_date: "2026-09-26", total_amount: 1200, turf_amount: 1200, hours: 2, rate_per_hour: 600, courts: 2, advance_paid: 1200, status: "Completed", start_time: "11:00 PM", end_time: "01:00 AM" }),
+  booking({
+    id: "mc8",
+    booking_date: "2026-09-26",
+    total_amount: 1200,
+    turf_amount: 1200,
+    hours: 2,
+    rate_per_hour: 600,
+    courts: 2,
+    advance_paid: 1200,
+    status: "Completed",
+    start_time: "11:00 PM",
+    end_time: "01:00 AM",
+  }),
 ] as unknown as Parameters<typeof periodStats>[0]["bookings"];
 const multiCourtBills = [
   {
@@ -290,11 +373,42 @@ const multiCourtBills = [
   },
 ] as unknown as Parameters<typeof periodStats>[0]["bills"];
 const multiPayments = [
-  { id: "mp4a", parent_type: "turf_booking", parent_id: "mc4", amount: 600, mode: "Cash", received_at: "2026-09-15T11:30:00.000Z", created_at: "2026-09-15T11:30:00.000Z" },
-  { id: "mp4b", parent_type: "turf_booking", parent_id: "mc4", amount: 400, mode: "UPI", received_at: "2026-09-15T11:31:00.000Z", created_at: "2026-09-15T11:31:00.000Z" },
-  { id: "mp5", parent_type: "turf_booking", parent_id: "mc5", amount: 1000, mode: "UPI", received_at: "2026-09-18T11:30:00.000Z", created_at: "2026-09-18T11:30:00.000Z" },
+  {
+    id: "mp4a",
+    parent_type: "turf_booking",
+    parent_id: "mc4",
+    amount: 600,
+    mode: "Cash",
+    received_at: "2026-09-15T11:30:00.000Z",
+    created_at: "2026-09-15T11:30:00.000Z",
+  },
+  {
+    id: "mp4b",
+    parent_type: "turf_booking",
+    parent_id: "mc4",
+    amount: 400,
+    mode: "UPI",
+    received_at: "2026-09-15T11:31:00.000Z",
+    created_at: "2026-09-15T11:31:00.000Z",
+  },
+  {
+    id: "mp5",
+    parent_type: "turf_booking",
+    parent_id: "mc5",
+    amount: 1000,
+    mode: "UPI",
+    received_at: "2026-09-18T11:30:00.000Z",
+    created_at: "2026-09-18T11:30:00.000Z",
+  },
 ] as never;
-const srcMulti = { bills: multiCourtBills, bookings: multiCourtBookings, sales: [], expenses: [], payments: multiPayments, tabEntries: [] };
+const srcMulti = {
+  bills: multiCourtBills,
+  bookings: multiCourtBookings,
+  sales: [],
+  expenses: [],
+  payments: multiPayments,
+  tabEntries: [],
+};
 
 /* --------------------------------------------------- hand-computed truth */
 
@@ -680,9 +794,21 @@ check("MC refundable advance liability", mc.refundableAdvance, 1000);
 check("MC turf revenue", mc.turfRevenue, 10099);
 check("MC bills revenue (merged booking's money)", mc.billsRevenue, 1400);
 check("MC3 tax", bookingDue(multiCourtBookings[2] as never), 0);
-check("MC6 merged: no booking due of its own", bookingDue(multiCourtBookings[5] as never), 0);
-check("MC7 legacy rebuild due", bookingDue(multiCourtBookings[6] as never), 1230);
-check("MC8 past-midnight due (tax owed on raw advance)", bookingDue(multiCourtBookings[7] as never), 276);
+check(
+  "MC6 merged: no booking due of its own",
+  bookingDue(multiCourtBookings[5] as never),
+  0,
+);
+check(
+  "MC7 legacy rebuild due",
+  bookingDue(multiCourtBookings[6] as never),
+  1230,
+);
+check(
+  "MC8 past-midnight due (tax owed on raw advance)",
+  bookingDue(multiCourtBookings[7] as never),
+  276,
+);
 // MC-8's 2 courts occupy 23:00–24:00 on day 0 and 00:00–01:00 on day 1.
 const mc8Segs = courtHourSegments(multiCourtBookings[7] as never);
 check("MC8 splits across midnight", mc8Segs.length, 2);
@@ -725,9 +851,16 @@ const [priyaMc] = customerLifetimeStats(
 );
 check("Priya MC merged booking still a visit", priyaMc!.bookingsCount, 2);
 check("Priya MC turfSpend excludes merged money", priyaMc!.turfSpend, 4500);
-check("Priya MC dues (MC-6 merged owes nothing itself)", priyaMc!.outstandingTurfDues, 3535);
-check("Priya MC avg includes the merged booking", priyaMc!.avgBookingValue, 2950);
-
+check(
+  "Priya MC dues (MC-6 merged owes nothing itself)",
+  priyaMc!.outstandingTurfDues,
+  3535,
+);
+check(
+  "Priya MC avg includes the merged booking",
+  priyaMc!.avgBookingValue,
+  2950,
+);
 
 /* -------------------- 12. Balance moved to dues (no double count, Oct) */
 

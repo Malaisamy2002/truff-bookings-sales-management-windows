@@ -540,7 +540,10 @@ export async function seedLoadTestData(
       updated_at: nowIso(),
     });
   }
-  const previousValue = (previousSlotSetting?.value ?? {}) as Record<string, unknown>;
+  const previousValue = (previousSlotSetting?.value ?? {}) as Record<
+    string,
+    unknown
+  >;
   await db.app_settings.put({
     key: "slot_durations",
     value: {
@@ -549,7 +552,10 @@ export async function seedLoadTestData(
       allow_45: previousValue["allow_45"] !== false,
       allow_60: previousValue["allow_60"] !== false,
       total_courts: LOAD_TEST_COURTS,
-      court_names: Array.from({ length: LOAD_TEST_COURTS }, (_, i) => `Court ${i + 1}`),
+      court_names: Array.from(
+        { length: LOAD_TEST_COURTS },
+        (_, i) => `Court ${i + 1}`,
+      ),
     },
     updated_at: nowIso(),
   });
@@ -669,7 +675,8 @@ export async function seedLoadTestData(
             bookingRand() < 0.12
           )
             courtsUsed++;
-          let hours = forcedCoverage && s === 0 && court === 1 ? forcedCoverage.hours : 1;
+          let hours =
+            forcedCoverage && s === 0 && court === 1 ? forcedCoverage.hours : 1;
           if (
             !forcedCoverage &&
             s + 1 < LOAD_TEST_SLOTS.length &&
@@ -686,8 +693,8 @@ export async function seedLoadTestData(
           }
 
           const rateRow = {
-            id: `loadtest-${slot.name}`,
-            slot_name: slot.name,
+            id: `loadtest-${slot.start}`,
+            slot_name: slot.start,
             is_active: true,
             rate_per_hour: rate,
             rate_15: null,
@@ -701,13 +708,18 @@ export async function seedLoadTestData(
           const pricePerCourt = priceForDuration(rateRow, hours * 60);
           const turfAmount = turfPrice(pricePerCourt, courtsUsed);
           const roll = bookingRand();
-          const discount = forcedCoverage && s === 0 && court === 1
-            ? rupees(forcedCoverage.discount === 10 ? turfAmount * 0.10 : forcedCoverage.discount)
-            : roll < 0.6
-              ? 0
-              : roll < 0.85
-                ? rupees(turfAmount * (0.05 + bookingRand() * 0.15))
-                : 100;
+          const discount =
+            forcedCoverage && s === 0 && court === 1
+              ? rupees(
+                  forcedCoverage.discount === 10
+                    ? turfAmount * 0.1
+                    : forcedCoverage.discount,
+                )
+              : roll < 0.6
+                ? 0
+                : roll < 0.85
+                  ? rupees(turfAmount * (0.05 + bookingRand() * 0.15))
+                  : 100;
           const total = Math.max(0, rupees(turfAmount - discount));
           const scenario =
             forcedCoverage && s === 0 && court === 1

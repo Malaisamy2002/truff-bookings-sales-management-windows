@@ -42,7 +42,10 @@ describe("backfillCourtIds", () => {
       row("legacy", "6 PM", { courts: 1 }),
     ]);
     expect(await backfillCourtIds(3)).toBe(1);
-    expect((await db.turf_bookings.get("seeded"))?.court_ids).toEqual(["c2", "c3"]);
+    expect((await db.turf_bookings.get("seeded"))?.court_ids).toEqual([
+      "c2",
+      "c3",
+    ]);
     expect((await db.turf_bookings.get("legacy"))?.court_ids).toEqual(["c1"]);
   });
 
