@@ -70,7 +70,9 @@ export const DEFAULT_SLOT_DURATIONS: SlotDurations = {
   total_courts: 1,
 };
 
-export const MAX_COURTS = 10;
+/** Safety ceiling only (stops a typo like 99999 creating thousands of court
+ * boxes). Any count from 1 to this is allowed. */
+export const MAX_COURTS = 100;
 export const clampCourts = (n: unknown) =>
   Math.max(1, Math.min(MAX_COURTS, Math.round(Number(n)) || 1));
 

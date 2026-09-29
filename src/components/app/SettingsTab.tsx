@@ -303,22 +303,15 @@ function SlotDurationsCard() {
               Bookings are given a free court automatically.
             </p>
           </div>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={MAX_COURTS}
-            className="w-20 text-center"
-            aria-label="Courts available"
+          <CourtCountField
             value={durations.total_courts ?? 1}
-            onChange={(e) => {
-              const n = clampCourts(e.target.value);
+            onCommit={(n) =>
               save.mutate({
                 ...durations,
                 total_courts: n,
                 court_names: courtNamesFor(n, durations.court_names),
-              });
-            }}
+              })
+            }
           />
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -343,6 +336,41 @@ function SlotDurationsCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Court count box — lets you clear and retype freely; clamps and saves on
+ * blur / Enter so typing "2" after deleting "1" doesn't become "12" → 10. */
+function CourtCountField({
+  value,
+  onCommit,
+}: {
+  value: number;
+  onCommit: (n: number) => void;
+}) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV(String(value)), [value]);
+  const commit = () => {
+    const n = clampCourts(v);
+    setV(String(n));
+    if (n !== value) onCommit(n);
+  };
+  return (
+    <Input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={MAX_COURTS}
+      className="w-20 text-center"
+      aria-label="Courts available"
+      value={v}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
   );
 }
 
