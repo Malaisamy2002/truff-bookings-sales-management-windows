@@ -1,0 +1,439 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+/*
+ * Self-hosted fonts (bundled at build time via @fontsource, not fetched from
+ * Google Fonts at runtime) — the app is offline-first (Android/Tauri/PWA all
+ * run with no guaranteed connectivity), and a render-blocking <link> to
+ * fonts.googleapis.com in the document head previously stalled first paint
+ * whenever the device had no network. Variable-weight builds so one file
+ * each covers the full 400–800 / 400–600 ranges this app actually uses.
+ */
+@import "@fontsource-variable/inter-tight";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Turf Bookings & Sales design system — "frosted ice-blue owner desk".
+ * Pale ice paper background, translucent blurred cards, one confident blue
+ * accent, semantic good/warn/bad, and per-business-line hues.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-turf: var(--turf);
+  --color-snacks: var(--snacks);
+  --color-bills: var(--bills);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --font-display: "Inter Tight Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Tight Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, monospace;
+
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 1rem;
+  --background: oklch(0.975 0.014 235);
+  --foreground: oklch(0.24 0.035 250);
+  --card: oklch(1 0 0 / 78%);
+  --card-foreground: oklch(0.24 0.035 250);
+  --popover: oklch(0.995 0.005 240);
+  --popover-foreground: oklch(0.24 0.035 250);
+  --primary: oklch(0.55 0.16 250);
+  --primary-foreground: oklch(0.99 0.005 240);
+  --secondary: oklch(0.94 0.02 235);
+  --secondary-foreground: oklch(0.32 0.05 250);
+  --muted: oklch(0.945 0.018 235);
+  --muted-foreground: oklch(0.52 0.03 248);
+  --accent: oklch(0.92 0.045 240);
+  --accent-foreground: oklch(0.32 0.07 250);
+  --destructive: oklch(0.58 0.2 22);
+  --destructive-foreground: oklch(0.99 0.005 240);
+  --success: oklch(0.52 0.13 165);
+  --success-foreground: oklch(0.99 0.005 240);
+  --warning: oklch(0.78 0.13 78);
+  --warning-foreground: oklch(0.28 0.05 78);
+  --turf: oklch(0.52 0.13 165);
+  --snacks: oklch(0.54 0.15 62);
+  --bills: oklch(0.55 0.16 250);
+  --border: oklch(0.88 0.022 240);
+  --input: oklch(0.88 0.022 240);
+  --ring: oklch(0.55 0.16 250);
+  --chart-1: oklch(0.55 0.16 250);
+  --chart-2: oklch(0.6 0.13 165);
+  --chart-3: oklch(0.72 0.15 62);
+  --chart-4: oklch(0.62 0.14 300);
+  --chart-5: oklch(0.58 0.2 22);
+  --sidebar: oklch(0.965 0.016 238);
+  --sidebar-foreground: oklch(0.24 0.035 250);
+  --sidebar-primary: oklch(0.55 0.16 250);
+  --sidebar-primary-foreground: oklch(0.99 0.005 240);
+  --sidebar-accent: oklch(0.92 0.045 240);
+  --sidebar-accent-foreground: oklch(0.32 0.07 250);
+  --sidebar-border: oklch(0.88 0.022 240);
+  --sidebar-ring: oklch(0.55 0.16 250);
+  --frost-shadow:
+    0 1px 2px oklch(0.4 0.05 250 / 6%), 0 12px 32px oklch(0.4 0.05 250 / 8%);
+}
+
+.dark {
+  --background: oklch(0.19 0.028 252);
+  --foreground: oklch(0.96 0.01 240);
+  --card: oklch(0.26 0.03 252 / 72%);
+  --card-foreground: oklch(0.96 0.01 240);
+  --popover: oklch(0.26 0.03 252);
+  --popover-foreground: oklch(0.96 0.01 240);
+  --primary: oklch(0.7 0.15 250);
+  --primary-foreground: oklch(0.18 0.03 252);
+  --secondary: oklch(0.31 0.035 252);
+  --secondary-foreground: oklch(0.96 0.01 240);
+  --muted: oklch(0.31 0.035 252);
+  --muted-foreground: oklch(0.74 0.02 245);
+  --accent: oklch(0.36 0.05 250);
+  --accent-foreground: oklch(0.95 0.02 240);
+  --destructive: oklch(0.56 0.19 22);
+  --destructive-foreground: oklch(0.98 0.01 240);
+  --success: oklch(0.7 0.13 165);
+  --success-foreground: oklch(0.18 0.03 252);
+  --warning: oklch(0.82 0.13 78);
+  --warning-foreground: oklch(0.22 0.03 78);
+  --turf: oklch(0.7 0.13 165);
+  --snacks: oklch(0.78 0.14 62);
+  --bills: oklch(0.7 0.15 250);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.15 250);
+  --chart-1: oklch(0.7 0.15 250);
+  --chart-2: oklch(0.7 0.13 165);
+  --chart-3: oklch(0.78 0.14 62);
+  --chart-4: oklch(0.72 0.14 300);
+  --chart-5: oklch(0.66 0.19 22);
+  --sidebar: oklch(0.24 0.03 252);
+  --sidebar-foreground: oklch(0.96 0.01 240);
+  --sidebar-primary: oklch(0.7 0.15 250);
+  --sidebar-primary-foreground: oklch(0.18 0.03 252);
+  --sidebar-accent: oklch(0.36 0.05 250);
+  --sidebar-accent-foreground: oklch(0.95 0.02 240);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.7 0.15 250);
+  --frost-shadow: 0 1px 2px oklch(0 0 0 / 30%), 0 12px 32px oklch(0 0 0 / 35%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  /* Visible keyboard focus for the raw <button>/<a> rows (list rows, sidebar,
+   * status strip) that don't carry their own ring classes. :where() keeps
+   * specificity at zero, so components with focus-visible:ring-* utilities
+   * (which also set outline-none) still win. */
+  :where(button, a[href], [role="button"], summary):focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    min-height: 100%;
+    background: var(--color-background);
+    /* No-op on WebView2, but keeps this file identical in behavior to the
+     * Android build's html rule so the two don't drift apart again. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    /* The window is user-resizable down to a narrow width — without this,
+     * content that doesn't shrink (a wide table, a long unbroken label)
+     * forces a horizontal scrollbar on the whole app instead of just
+     * scrolling within its own section. */
+    min-width: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    color: var(--color-foreground);
+    background-color: var(--color-background);
+    background-image:
+      radial-gradient(
+        90rem 50rem at 8% -12%,
+        oklch(0.72 0.09 250 / 22%),
+        transparent 60%
+      ),
+      radial-gradient(
+        70rem 40rem at 105% 0%,
+        oklch(0.75 0.08 200 / 18%),
+        transparent 62%
+      );
+    background-attachment: fixed;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-x: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Prevents a wide image, icon or embedded PDF preview from forcing the
+   * window wider than its content area when resized down. */
+  img,
+  svg,
+  canvas {
+    max-width: 100%;
+  }
+
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Figures never jitter as they update */
+  .tabular,
+  table,
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Large, touch-friendly numeric fields */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Hero figure: large display number that stays legible on small screens. */
+@utility stat-hero {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 6vw, 2.125rem);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility stat-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mono micro-label for card captions and timestamps. */
+@utility stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Softer frosted surface for inner rows / chips. No backdrop-filter here on
+   purpose: kept in sync with the Android repo, where this utility is
+   applied per-row inside scrolling lists and a blurred+composited layer
+   per row was the root cause of a real scroll-perf bug there. The higher
+   solid mix below approximates the frosted look without the blur pass. */
+@utility frost-soft {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  border-color: color-mix(in oklab, var(--border) 60%, transparent);
+}
+
+/* Inset well used for previews, totals and grouped inputs. */
+@utility frost-well {
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+  box-shadow: inset 0 1px 3px
+    color-mix(in oklab, oklch(0.4 0.05 250) 12%, transparent);
+}
+
+/* Mono micro-label used for section captions across every tab. */
+@utility micro-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+@utility page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  line-height: 1.15;
+}
+
+/* Lifts interactive frosted surfaces on hover. */
+@utility lift {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+  /* Hover-capable pointers only: on touch screens :hover sticks after a tap,
+   * leaving the tapped card raised with a shadow until you tap elsewhere. */
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 1px 0 color-mix(in oklab, oklch(1 0 0) 26%, transparent),
+        0 14px 32px -14px
+          color-mix(in oklab, oklch(0.55 0.16 250) 34%, transparent);
+    }
+  }
+}
+
+@utility brand-gradient {
+  /* Light theme puts white text on this, so it has to stay dark enough for
+   * AA contrast end to end. The old end colour (65% primary + 35% white) was
+   * only ~2.5:1 with white text; this ranges roughly 4.7:1 to 8:1. */
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--primary) 80%, black 20%),
+    var(--primary)
+  );
+
+  /* Dark theme uses dark text on a bright primary, so there the gradient
+   * keeps lightening toward the far corner (which only helps contrast). */
+  .dark & {
+    background-image: linear-gradient(
+      135deg,
+      var(--primary),
+      color-mix(in oklab, var(--primary) 65%, white 35%)
+    );
+  }
+}
+
+/* Frosted ice-blue glass surface. */
+@utility frost {
+  background: color-mix(in oklab, var(--card) 62%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-color: color-mix(in oklab, var(--border) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, oklch(1 0 0) 22%, transparent),
+    0 8px 24px -12px color-mix(in oklab, oklch(0.55 0.16 250) 22%, transparent);
+}
+
+/* Opaque-enough surface for chrome that floats over scrolling content (bottom
+   nav, sticky cart bar). .frost is only ~48% opaque — --card is already ~78%
+   alpha and .frost mixes it down to 62% again — so list text showed straight
+   through. Don't rely on backdrop blur (Android WebView may skip it). */
+@utility chrome-solid {
+  background: var(--background);
+  border-color: color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+/* Short colour transition on surfaces so switching light/dark or a theme feels
+   like a fade rather than a jump. Skipped when the user prefers less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  [data-slot="card"],
+  .bg-card,
+  .bg-background,
+  .bg-muted,
+  .bg-popover,
+  .bg-sidebar {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+}
+
+/* Compact density — set from Settings → Layout & arrangement. Tightens the
+   gaps and card padding across the app without changing any layout rules. */
+[data-density="compact"] {
+  --density-gap: 0.75rem;
+}
+[data-density="compact"] main {
+  padding-top: 0.75rem;
+}
+[data-density="compact"] .space-y-6 > * + * {
+  margin-top: var(--density-gap);
+}
+[data-density="compact"] .space-y-4 > * + * {
+  margin-top: 0.625rem;
+}
+[data-density="compact"] .space-y-3 > * + * {
+  margin-top: 0.5rem;
+}
+[data-density="compact"] [data-slot="card-content"] {
+  padding: 0.75rem;
+}
+
+/*
+ * Small red text (overdue amounts, form errors) uses its own token so it can
+ * be tuned for contrast independently of the destructive *button* colour:
+ * --destructive itself measured ~3.6:1 on the dark background (3.0:1 on
+ * cards) and 4.4:1 on the light one. Unlayered on purpose, so it wins over
+ * the generated `text-destructive` utility.
+ */
+:root {
+  --destructive-text: oklch(0.55 0.2 22);
+}
+.dark {
+  --destructive-text: oklch(0.7 0.17 22);
+}
+.text-destructive {
+  color: var(--destructive-text);
+}
+
+/* Long user-entered text must never overflow its container: break over-long
+   words instead of letting them spill past the card or get clipped. This
+   only affects words longer than the available width — normal text and
+   layouts are untouched. Covers every field: descriptions, notes, names,
+   IDs. */
+*,
+*::before,
+*::after {
+  overflow-wrap: break-word;
+}
