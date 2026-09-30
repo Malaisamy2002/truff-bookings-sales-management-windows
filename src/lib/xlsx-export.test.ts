@@ -370,6 +370,36 @@ describe("indian style + consistency", () => {
   });
 });
 
+describe("all-time dashboard", () => {
+  it("shows a caption instead of a vs-last-month delta and a custom P&L heading", () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Dashboard");
+    buildDashboardSheet(ws, {
+      ...dash,
+      periodLabel: "All time \u00b7 Jan 2025 \u2013 May 2026",
+      pnlHeading: "PROFIT & LOSS \u2014 ALL 17 MONTHS",
+      kpis: [
+        {
+          label: "Revenue",
+          value: 138000,
+          previous: 0,
+          change: null,
+          caption: "All time",
+        },
+        { label: "Profit", value: 40000, previous: 30000, change: 33.3 },
+      ],
+    });
+    const texts: string[] = [];
+    ws.eachRow((r) => r.eachCell((c) => texts.push(String(c.value))));
+    expect(texts).toContain("All time");
+    expect(texts).toContain("PROFIT & LOSS \u2014 ALL 17 MONTHS");
+    expect(texts).not.toContain("PROFIT & LOSS \u2014 LAST 6 MONTHS");
+    // a KPI without a caption keeps the normal delta line
+    expect(texts.some((t) => /33\.3% vs last month/.test(t))).toBe(true);
+    expect(String(ws.getCell(2, 1).value)).toContain("All time");
+  });
+});
+
 describe("dashboard card borders", () => {
   it("draws only the outer frame of each KPI card (no inner lines)", async () => {
     const wb = new ExcelJS.Workbook();

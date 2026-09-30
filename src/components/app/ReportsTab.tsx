@@ -890,10 +890,10 @@ export function ReportsTab() {
    * never be clicked would be wasted work. Everything below only runs
    * when the person actually picks "All time".
    *
-   * The Dashboard/Summary sheets (month-vs-previous-month KPI cards) don't
-   * have a sensible "all time" equivalent — there's no "previous" period
-   * to compare all of history against — so this workbook omits them and
-   * leads with the Profit & loss trend instead.
+   * The Dashboard is included with lifetime totals and no "vs last month"
+   * arrows (there's no previous period to compare all of history against —
+   * each KPI card says "All time" instead). The month-vs-previous-month
+   * Summary sheet is still omitted for the same reason.
    */
   const exportFullReport = async () => {
     const range = dataDateRange(src);
@@ -912,8 +912,96 @@ export function ReportsTab() {
     const occupancyFull = turfOccupancy(bookings, () => true, tabEntries);
     const itemPerfFull = itemPerformance(sales, () => true);
 
+    // Lifetime totals = the sum of the per-month rows of the same
+    // profitAndLoss() the "Profit and loss" sheet prints, so the Dashboard
+    // cards and that sheet can't disagree.
+    const printSettings = readPrintSettings();
+    const total = (pick: (r: (typeof pnlFull)[number]) => number) =>
+      rupees(pnlFull.reduce((n, r) => n + pick(r), 0));
+    const allRevenue = total((r) => r.Revenue);
+    const allCollected = total((r) => r.Collected);
+    const allCollectionRate =
+      allRevenue > 0 ? (allCollected / allRevenue) * 100 : 0;
+    const financialBookingCount = bookings.filter(isFinancialBooking).length;
+    const topDebtor = lifetimeStats.reduce<{
+      name: string;
+      value: number;
+    } | null>(
+      (best, c) =>
+        c.outstandingTotal > (best?.value ?? 0)
+          ? { name: c.name, value: c.outstandingTotal }
+          : best,
+      null,
+    );
+    const allTimeLabel = `All time · ${monthLabel(keys[0])} – ${monthLabel(keys[keys.length - 1])}`;
+    const allKpi = (label: string, value: number, invert = false) => ({
+      label,
+      value,
+      previous: 0,
+      change: null,
+      invert,
+      caption: "All time",
+    });
+
     await exportWorkbook(
       [
+        {
+          name: "Dashboard",
+          build: (ws) =>
+            buildDashboardSheet(ws, {
+              shopName: printSettings.shopName || "Business",
+              periodLabel: allTimeLabel,
+              currencySymbol: printSettings.currencySymbol,
+              kpis: [
+                allKpi("Net revenue", total((r) => r.NetRevenue)),
+                allKpi("Tax", total((r) => r.Tax)),
+                allKpi("Revenue (incl. tax)", allRevenue),
+                allKpi("Profit", total((r) => r.Profit)),
+                allKpi("Collected", allCollected),
+                allKpi("Expenses", total((r) => r.Expenses), true),
+                allKpi("Dues", total((r) => r.Dues), true),
+                {
+                  ...allKpi("Collection rate", allCollectionRate),
+                  isCurrency: false,
+                },
+              ],
+              collectionRatePct: allCollectionRate,
+              topExpense: categoriesFull[0] ?? null,
+              avgBookingValue:
+                financialBookingCount > 0
+                  ? total((r) => r.Turf) / financialBookingCount
+                  : 0,
+              topDebtor,
+              pnlHeading: `PROFIT & LOSS — ALL ${keys.length} MONTHS`,
+              pnl: pnlFull.map((r) => ({
+                month: r.month,
+                Revenue: r.Revenue,
+                Expenses: r.Expenses,
+                Profit: r.Profit,
+                Turf: r.Turf,
+                Snacks: r.Snacks,
+                Bills: r.Bills,
+                Collected: r.Collected,
+                Dues: r.Dues,
+              })),
+              paymentSplit: splitFull.map((s) => ({
+                name: s.name,
+                value: s.value,
+              })),
+              expenseCategories: categoriesFull.map((c) => ({
+                name: c.name,
+                value: c.value,
+              })),
+              weekdayBookings: occupancyFull.byWeekday.map((r) => ({
+                label: r.label,
+                bookings: r.bookings,
+              })),
+              topItems: itemPerfFull.rows.map((r) => ({
+                name: r.name,
+                revenue: r.revenue,
+              })),
+            }),
+        },
         {
           name: "Profit and loss",
           rows: pnlFull.map((r) => ({
@@ -1184,6 +1272,11 @@ export function ReportsTab() {
       // "-<exportdate>.xlsx" on top of this.
       `reports-full-${range.earliest}_${range.latest}`,
       INVOICE_SECTIONS.reports,
+      {
+        shopName: printSettings.shopName || "Business",
+        currencySymbol: printSettings.currencySymbol,
+        periodLabel: allTimeLabel,
+      },
     );
     toast.success("Full history exported", {
       description: `${keys.length} months · ${formatDMY(range.earliest)} to ${formatDMY(range.latest)}`,

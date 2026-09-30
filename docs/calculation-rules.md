@@ -471,6 +471,13 @@ snackProfit    = Σ sale.profit
 `avgBookingValue` (Reports/Dashboard KPI, month-scoped) =
 `turfRevenue / (count of unmerged, non-cancelled bookings that month)`.
 
+The "All time" Excel export's Dashboard uses the same formula over every
+loaded month (Σ monthly `turfRevenue` / count of unmerged, non-cancelled
+bookings). Its KPI cards are the sums of the same monthly `profitAndLoss()`
+rows printed on the "Profit and loss" sheet (`Dues` therefore sums each
+month's revenue − collected), and carry an "All time" caption instead of a
+month-over-month delta.
+
 ## 5b. Multi-court bookings
 
 A booking has both a court count (`courts`) and, on current rows, the named
