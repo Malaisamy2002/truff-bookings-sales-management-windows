@@ -21,6 +21,11 @@ export type DashboardKpi = {
   /** true when a rise in this metric is bad news (e.g. Expenses). */
   invert?: boolean;
   isCurrency?: boolean;
+  /**
+   * Replaces the "▲ x% vs last month" line. Used by the all-time Dashboard,
+   * where there is no previous period to compare against.
+   */
+  caption?: string;
 };
 
 export type DashboardPnlRow = {
@@ -52,6 +57,8 @@ export type DashboardData = {
   topItems?: { name: string; revenue: number }[];
   /** Biggest outstanding customer, shown in the insights strip. */
   topDebtor?: { name: string; value: number } | null;
+  /** Heading above the P&L mini table; defaults to the last-6-months wording. */
+  pnlHeading?: string;
 };
 
 /** "₹ 1,38,000" — same Indian grouping as the number formats in the cells. */
@@ -78,7 +85,10 @@ function writeKpiCard(
     kpi.isCurrency === false
       ? `${kpi.value.toFixed(1)}%`
       : fmtMoney(currencySymbol, kpi.value);
-  const delta = fmtDelta(kpi.change, kpi.invert ?? false);
+  const delta =
+    kpi.caption !== undefined
+      ? { text: kpi.caption, good: null as boolean | null }
+      : fmtDelta(kpi.change, kpi.invert ?? false);
 
   // Label row
   ws.mergeCells(row, col, row, col + 2);
@@ -286,7 +296,7 @@ export function buildDashboardSheet(ws: Worksheet, data: DashboardData) {
   if (charts.length > 0) ws.getRow(row - 1).addPageBreak();
   ws.mergeCells(row, 1, row, totalCols);
   const pnlHeader = ws.getCell(row, 1);
-  pnlHeader.value = "PROFIT & LOSS — LAST 6 MONTHS";
+  pnlHeader.value = data.pnlHeading ?? "PROFIT & LOSS — LAST 6 MONTHS";
   pnlHeader.font = { size: 9, bold: true, color: { argb: COLOR.muted } };
   pnlHeader.alignment = { indent: 1 };
   row += 1;
