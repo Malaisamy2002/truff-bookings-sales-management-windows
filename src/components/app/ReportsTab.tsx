@@ -923,17 +923,11 @@ export function ReportsTab() {
     const allCollectionRate =
       allRevenue > 0 ? (allCollected / allRevenue) * 100 : 0;
     const financialBookingCount = bookings.filter(isFinancialBooking).length;
-    const topDebtor = lifetimeStats.reduce<{
-      name: string;
-      value: number;
-    } | null>(
-      (best, c) =>
-        c.outstandingTotal > (best?.value ?? 0)
-          ? { name: c.name, value: c.outstandingTotal }
-          : best,
-      null,
-    );
-    const allTimeLabel = `All time · ${monthLabel(keys[0])} – ${monthLabel(keys[keys.length - 1])}`;
+    let topDebtor: { name: string; value: number } | null = null;
+    for (const c of lifetimeStats)
+      if (c.outstandingTotal > (topDebtor?.value ?? 0))
+        topDebtor = { name: c.name, value: c.outstandingTotal };
+    const allTimeLabel = `All time · ${pnlFull[0]?.month ?? ""} – ${pnlFull[pnlFull.length - 1]?.month ?? ""}`;
     const allKpi = (label: string, value: number, invert = false) => ({
       label,
       value,
