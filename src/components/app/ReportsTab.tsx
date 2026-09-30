@@ -551,11 +551,36 @@ export function ReportsTab() {
                 Revenue: r.Revenue,
                 Expenses: r.Expenses,
                 Profit: r.Profit,
+                Turf: r.Turf,
+                Snacks: r.Snacks,
+                Bills: r.Bills,
+                Collected: r.Collected,
+                Dues: r.Dues,
+              })),
+              paymentSplit: split.map((s) => ({
+                name: s.name,
+                value: s.value,
+              })),
+              expenseCategories: categories.map((c) => ({
+                name: c.name,
+                value: c.value,
+              })),
+              weekdayBookings: occupancy.byWeekday.map((r) => ({
+                label: r.label,
+                bookings: r.bookings,
+              })),
+              topItems: itemRows.map((r) => ({
+                name: r.name,
+                revenue: r.revenue,
               })),
             }),
         },
         {
           name: "Summary",
+          // Rows are different metrics (profit, tax, dues…) — a column total
+          // would add unlike things together.
+          noTotals: true,
+          moneyColumns: [monthLabel(month), monthLabel(prevMonthKey(month))],
           rows: compareCards.map((c) => ({
             Metric: c.label,
             [monthLabel(month)]: c.value,
@@ -837,6 +862,11 @@ export function ReportsTab() {
       ],
       `report-${month}`,
       INVOICE_SECTIONS.reports,
+      {
+        shopName: printSettings.shopName || "Business",
+        currencySymbol: printSettings.currencySymbol,
+        periodLabel: monthLabel(month),
+      },
     );
     toast.success("Report exported");
   };
